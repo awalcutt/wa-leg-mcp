@@ -21,6 +21,11 @@ This MCP server connects AI assistants to the Washington State Legislative Web S
 - `getBillStatus` - Get current status and history of a bill
 - `getBillDocuments` - Retrieve bill text and amendments
 
+### MCP Resources
+- `bill://xml/{biennium}/{chamber}/{bill_number}` - Access bill documents in structured XML format
+- `bill://htm/{biennium}/{chamber}/{bill_number}` - Access bill documents in HTML format
+- `bill://pdf/{biennium}/{chamber}/{bill_number}` - Get URLs for bill PDF documents
+- `bill://document/{format}/{biennium}/{chamber}/{bill_number}` - Generic format for accessing bill documents
 
 
 ## Installation
@@ -88,6 +93,9 @@ wa-leg-mcp/
 │   │   │   ├── bill_tools.py
 │   │   │   ├── committee_tools.py
 │   │   │   └── legislator_tools.py
+│   │   ├── resources/          # MCP resource implementations
+│   │   │   ├── __init__.py
+│   │   │   └── bill_resources.py # Bill document resources
 │   │   ├── clients/            # API clients
 │   │   │   ├── __init__.py
 │   │   │   └── wsl_client.py   # WA State Legislature API client
@@ -97,6 +105,7 @@ wa-leg-mcp/
 ├── tests/                      # Test suite
 │   ├── __init__.py
 │   ├── test_bill_tools.py
+│   ├── test_bill_resources.py  # Tests for bill resources
 │   ├── test_committee_tools.py
 │   ├── test_legislator_tools.py
 │   ├── test_server.py
@@ -206,6 +215,13 @@ async def connect_to_legislature_mcp():
         })
         
         print(result)
+        
+        # Access a resource
+        bill_xml = await session.read_resource(
+            "bill://xml/2025-26/House/1234"
+        )
+        
+        print(f"Bill XML content length: {len(bill_xml)}")
 
 asyncio.run(connect_to_legislature_mcp())
 ```
@@ -270,6 +286,52 @@ Parameters:
 - `document_type` (string, optional): "bill", "amendment", "report"
 
 Returns: Document metadata with links to HTML and PDF versions
+
+### Resources
+
+#### Bill Document Resources
+The MCP server provides direct access to bill documents through URI templates:
+
+##### bill://xml/{biennium}/{chamber}/{bill_number}
+Access bill documents in structured XML format (recommended for AI processing).
+
+Parameters:
+- `biennium` (string): Legislative biennium in format "YYYY-YY" (e.g., "2025-26")
+- `chamber` (string): Chamber name - must be exactly "House" or "Senate"
+- `bill_number` (string): Bill number as numeric string (e.g., "1234")
+
+Returns: XML content of the bill document
+
+##### bill://htm/{biennium}/{chamber}/{bill_number}
+Access bill documents in HTML format with hyperlinks to referenced laws.
+
+Parameters:
+- `biennium` (string): Legislative biennium in format "YYYY-YY"
+- `chamber` (string): "House" or "Senate"
+- `bill_number` (string): Bill number
+
+Returns: HTML content of the bill document
+
+##### bill://pdf/{biennium}/{chamber}/{bill_number}
+Get URLs for bill PDF documents (content not fetched).
+
+Parameters:
+- `biennium` (string): Legislative biennium in format "YYYY-YY"
+- `chamber` (string): "House" or "Senate"
+- `bill_number` (string): Bill number
+
+Returns: Dictionary with URL to access the PDF document
+
+##### bill://document/{format}/{biennium}/{chamber}/{bill_number}
+Generic format for accessing bill documents in any supported format.
+
+Parameters:
+- `format` (string): Document format - "xml", "htm", or "pdf"
+- `biennium` (string): Legislative biennium in format "YYYY-YY"
+- `chamber` (string): "House" or "Senate"
+- `bill_number` (string): Bill number
+
+Returns: Document content or URL based on format
 
 ## Contributing
 

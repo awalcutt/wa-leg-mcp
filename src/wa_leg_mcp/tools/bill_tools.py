@@ -65,7 +65,9 @@ def get_bill_info(bill_number: int, biennium: Optional[str] = None) -> Dict[str,
         return {"error": f"Failed to fetch bill information: {str(e)}"}
 
 
-def search_bills(year: Optional[str] = None, agency: Optional[str] = None, active_only: bool = False) -> Dict[str, Any]:
+def search_bills(
+    year: Optional[str] = None, agency: Optional[str] = None, active_only: bool = False
+) -> Dict[str, Any]:
     """
     Search for bills in a specific year with optional filtering.
 
@@ -262,7 +264,9 @@ def get_bill_amendments(bill_number: int, year: Optional[str] = None) -> Dict[st
 
         # Filter amendments for the specific bill
         bill_amendments = [
-            amendment for amendment in amendments_data if amendment.get("bill_number") == bill_number
+            amendment
+            for amendment in amendments_data
+            if amendment.get("bill_number") == bill_number
         ]
 
         if not bill_amendments:

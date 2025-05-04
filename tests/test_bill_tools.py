@@ -274,7 +274,9 @@ class TestBillTools(unittest.TestCase):
         result = get_bill_documents(self.test_bill_number)
 
         # Assertions
-        mock_client.get_documents.assert_called_once_with(self.test_biennium, str(self.test_bill_number))
+        mock_client.get_documents.assert_called_once_with(
+            self.test_biennium, str(self.test_bill_number)
+        )
         assert result["bill_number"] == self.test_bill_number
         assert result["count"] == 2
         assert len(result["documents"]) == 2
@@ -426,7 +428,7 @@ class TestBillTools(unittest.TestCase):
         # Assertions
         assert "error" in result
         assert "Failed to fetch amendments" in result["error"]
-        
+
     @patch("wa_leg_mcp.tools.bill_tools.get_current_biennium")
     @patch("wa_leg_mcp.tools.bill_tools.wsl_client")
     def test_get_bill_amendments_no_matching_bill(self, mock_client, mock_get_biennium):
@@ -434,8 +436,11 @@ class TestBillTools(unittest.TestCase):
         # Setup mocks
         mock_get_biennium.return_value = self.test_biennium
         # Create amendments data with only bill 5678, not our test bill 1234
-        amendments_data = [amendment for amendment in self.mock_amendments_data 
-                          if amendment.get("bill_number") != self.test_bill_number]
+        amendments_data = [
+            amendment
+            for amendment in self.mock_amendments_data
+            if amendment.get("bill_number") != self.test_bill_number
+        ]
         mock_client.get_amendments.return_value = amendments_data
 
         # Call function

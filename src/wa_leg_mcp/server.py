@@ -15,6 +15,7 @@ from typing import Any, Callable, Dict, List, Optional
 from dotenv import load_dotenv
 from mcp.server.fastmcp import FastMCP
 
+from .resources.bill_resources import get_bill_document_templates, read_bill_document
 from .tools import (
     find_legislator,
     get_bill_documents,
@@ -87,6 +88,48 @@ def get_default_tools() -> List[Callable]:
     ]
 
 
+def register_bill_resources(mcp: FastMCP) -> None:
+    """
+    Register bill document templates with the MCP resource manager.
+
+    This function creates a single resource handler for bill documents and registers
+    all templates with the MCP server.
+
+    Args:
+        mcp: The MCP server instance to register templates with.
+    """
+
+    # Create a single resource function to handle all bill document requests
+    async def bill_document_handler(
+        uri: str = "",
+        biennium: Optional[str] = None,
+        chamber: Optional[str] = None,
+        bill_number: Optional[str] = None,
+        bill_format: Optional[str] = None,
+    ):
+        """Handle bill document resource requests."""
+        return await read_bill_document(
+            uri=uri,
+            biennium=biennium,
+            chamber=chamber,
+            bill_number=bill_number,
+            bill_format=bill_format,
+        )
+
+    # Get all bill document templates and register them with the same handler
+    for template in get_bill_document_templates():
+        template.fn = bill_document_handler
+
+        # Add the template to the resource manager
+        mcp._resource_manager.add_template(
+            fn=template.fn,
+            uri_template=template.uri_template,
+            name=template.name,
+            description=template.description,
+            mime_type=template.mime_type,
+        )
+
+
 def create_server(
     config: Optional[ServerConfig] = None, tools: Optional[List[Callable]] = None
 ) -> FastMCP:
@@ -112,6 +155,9 @@ def create_server(
     # Add all tools to the server
     for tool in tools:
         mcp.add_tool(tool)
+
+    # Register bill document templates
+    register_bill_resources(mcp)
 
     return mcp
 

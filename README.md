@@ -26,17 +26,17 @@ This MCP server connects AI assistants to the Washington State Legislative Web S
 ## Installation
 
 ### Prerequisites
-- Python 3.9+
-- pip or uv package manager
+- Python 3.10+
+- pip package manager
 
-### Using pip
+### Development Installation
 ```bash
-pip install -r requirements.txt
+pip install -e ".[dev]"
 ```
 
-### Using uv (recommended)
+### Production Installation
 ```bash
-uv pip install -r requirements.txt
+pip install .
 ```
 
 ## Quick Start
@@ -72,6 +72,7 @@ Create a `.env` file:
 WSL_API_TIMEOUT=30
 WSL_CACHE_TTL=300
 LOG_LEVEL=INFO
+SERVER_NAME="Washington State Legislature MCP Server"
 ```
 
 ## Repository Structure
@@ -89,27 +90,22 @@ wa-leg-mcp/
 │   │   │   └── legislator_tools.py
 │   │   ├── clients/            # API clients
 │   │   │   ├── __init__.py
-│   │   │   ├── wsl_client.py   # WA State Legislature API client
-│   │   │   └── geocoding_client.py
-│   │   ├── cache/              # Caching layer
-│   │   │   ├── __init__.py
-│   │   │   └── cache_manager.py
+│   │   │   └── wsl_client.py   # WA State Legislature API client
 │   │   └── utils/              # Utility functions
 │   │       ├── __init__.py
 │   │       └── formatters.py
 ├── tests/                      # Test suite
 │   ├── __init__.py
-│   ├── conftest.py
-│   ├── test_tools/
-│   └── test_clients/
-├── docker/                     # Docker configurations
-│   ├── Dockerfile
-│   └── docker-compose.yml
-├── requirements.txt
-├── pyproject.toml
+│   ├── test_bill_tools.py
+│   ├── test_committee_tools.py
+│   ├── test_legislator_tools.py
+│   ├── test_server.py
+│   ├── test_utils_formatters.py
+│   └── test_wsl_client.py
+├── pyproject.toml              # Project configuration and dependencies
+├── Makefile                    # Development workflow commands
 ├── README.md
-├── LICENSE
-└── .env.example
+└── LICENSE
 ```
 
 ## Development
@@ -130,12 +126,12 @@ source venv/bin/activate  # Or `venv\Scripts\activate` on Windows
 
 3. Install development dependencies:
 ```bash
-pip install -r requirements-dev.txt
+pip install -e ".[dev]"
 ```
 
 4. Run tests:
 ```bash
-pytest
+make test
 ```
 
 ### Adding New Tools
@@ -143,7 +139,7 @@ pytest
 1. Create a new file in `src/wa_leg_mcp/tools/`
 2. Implement tool using the MCP decorator:
 ```python
-from mcp.server import Tool
+from mcp.server.fastmcp import Tool
 
 @Tool("toolName", description="Tool description")
 def tool_function(param1: str, param2: str = None):
@@ -151,21 +147,19 @@ def tool_function(param1: str, param2: str = None):
     return {"result": data}
 ```
 
-3. Register tool in server.py
-4. Add tests in `tests/test_tools/`
+3. Register tool in server.py by adding it to the `get_default_tools()` function
+4. Add tests in `tests/`
 
 ## Deployment Options
 
 ### Local Deployment
 - Run directly with Python
 - Use with MCP Inspector for development
-- Docker container for isolated environment
 
 ### Cloud Deployment
 - AWS Lambda with API Gateway (supports remote connections via `mcp-remote` adapter)
 - Google Cloud Functions
 - Azure Functions
-- Docker-based deployments (ECS, Cloud Run, etc.)
 
 ### Environment Variables
 
@@ -174,6 +168,7 @@ def tool_function(param1: str, param2: str = None):
 | `WSL_API_TIMEOUT` | API request timeout (seconds) | 30 |
 | `WSL_CACHE_TTL` | Cache time-to-live (seconds) | 300 |
 | `LOG_LEVEL` | Logging level | INFO |
+| `SERVER_NAME` | Custom server name | Washington State Legislature MCP Server |
 
 ## Usage Examples
 
@@ -249,7 +244,7 @@ Parameters:
 Returns: List of committee meetings with dates, times, locations, and agenda items
 
 #### findLegislator
-Finds legislators using the GetSponsors API (note: district lookup requires additional geocoding).
+Finds legislators using the GetSponsors API.
 
 Parameters:
 - `biennium` (string, required): Legislative biennium in format "2025-26"

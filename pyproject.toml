@@ -1,0 +1,112 @@
+[build-system]
+requires = ["setuptools>=61.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "wa-leg-mcp"
+version = "0.1.0"
+description = "Model Context Protocol server for Washington State Legislative Web Services API"
+readme = "README.md"
+requires-python = ">=3.10"
+license = {text = "MIT"}
+authors = [
+    {name = "Alex Adacutt", email = "alex@adacutt.house"}
+]
+keywords = ["mcp", "washington", "legislature", "civic", "government"]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Topic :: Software Development :: Libraries :: Python Modules",
+]
+dependencies = [
+    "mcp>=1.7.0",
+    "wa-leg-api>=0.4.0",
+    "python-dotenv>=1.0.0",
+    "requests>=2.31.0",
+    "cachetools>=5.3.0",
+    "pydantic>=2.0.0",
+    "typing-extensions>=4.7.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=7.4.0",
+    "pytest-asyncio>=0.21.0",
+    "pytest-cov>=4.1.0",
+    "black>=23.3.0",
+    "ruff>=0.0.280",
+    "isort>=5.12.0",
+    "build>=0.10.0",
+    "twine>=4.0.0",
+]
+async = [
+    "aiohttp>=3.8.0",
+]
+monitoring = [
+    "structlog>=23.1.0",
+]
+all = [
+    "wa-leg-mcp[async,monitoring]",
+]
+
+[project.urls]
+Homepage = "https://github.com/awalcutt/wa-leg-mcp"
+Documentation = "https://github.com/awalcutt/wa-leg-mcp#readme"
+Repository = "https://github.com/awalcutt/wa-leg-mcp.git"
+Issues = "https://github.com/awalcutt/wa-leg-mcp/issues"
+
+[project.scripts]
+wa-leg-mcp = "wa_leg_mcp.server:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+include = ["wa_leg_mcp*"]
+
+[tool.black]
+line-length = 100
+target-version = ['py310']
+
+[tool.ruff]
+line-length = 100
+lint.select = ["E", "F", "I", "N", "W", "B", "A", "C4", "PT", "SIM"]
+lint.ignore = ["E501"]
+target-version = "py310"
+
+[tool.ruff.lint.per-file-ignores]
+"tests/*" = ["E402", "S101"]
+
+[tool.isort]
+profile = "black"
+line_length = 100
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+asyncio_default_fixture_loop_scope = "function"
+testpaths = ["tests"]
+addopts = "--cov=wa_leg_mcp --cov-report=term-missing --cov-report=html"
+
+[tool.coverage.run]
+source = ["src/wa_leg_mcp"]
+omit = [
+    "*/tests/*",
+    "*/__init__.py"
+]
+
+[tool.coverage.report]
+exclude_lines = [
+    "pragma: no cover",
+    "def __repr__",
+    "if self.debug:",
+    "if settings.DEBUG",
+    "raise AssertionError",
+    "raise NotImplementedError",
+    "if 0:",
+    "if __name__ == .__main__.:",
+    "class .*\\bProtocol\\):",
+    "@(abc\\.)?abstractmethod",
+]
+show_missing = true

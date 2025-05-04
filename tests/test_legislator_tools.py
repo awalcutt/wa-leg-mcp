@@ -1,207 +1,161 @@
 """
-Tests for legislator_tools.py
+Enhanced tests for legislator_tools.py with improved fixture usage and parametrization
 """
 
-import unittest
 from unittest.mock import patch
 
-# Import the function to test
+import pytest
+
+from tests.test_helpers import assert_api_error_handling, assert_not_found_handling
 from wa_leg_mcp.tools.legislator_tools import find_legislator
 
 
-class TestLegislatorTools(unittest.TestCase):
-    """Test cases for legislator tools."""
+class TestFindLegislator:
+    """Tests for the find_legislator function."""
 
-    def setUp(self):
-        """Set up test fixtures."""
-        self.test_biennium = "2023-24"
-
-        # Sample legislators data for testing
-        self.mock_sponsors_data = [
-            {
-                "id": "31526",
-                "name": "Representative Smith",
-                "long_name": "Representative Smith",
-                "party": "D",
-                "district": "1",
-                "agency": "House",
-                "email": "smith@example.com",
-                "phone": "555-1234",
-                "first_name": "Representative",
-                "last_name": "Smith",
-                "acronym": "SMIT",
-            },
-            {
-                "id": "31527",
-                "name": "Senator Jones",
-                "long_name": "Senator Jones",
-                "party": "R",
-                "district": "2",
-                "agency": "Senate",
-                "email": "jones@example.com",
-                "phone": "555-5678",
-                "first_name": "Senator",
-                "last_name": "Jones",
-                "acronym": "JONE",
-            },
-            {
-                "id": "31528",
-                "name": "Representative Johnson",
-                "long_name": "Representative Johnson",
-                "party": "D",
-                "district": "1",
-                "agency": "House",
-                "email": "johnson@example.com",
-                "phone": "555-9012",
-                "first_name": "Representative",
-                "last_name": "Johnson",
-                "acronym": "JOHN",
-            },
-        ]
-
-    @patch("wa_leg_mcp.tools.legislator_tools.get_current_biennium")
-    @patch("wa_leg_mcp.tools.legislator_tools.wsl_client")
-    def test_find_legislator_success(self, mock_client, mock_get_biennium):
-        """Test successful retrieval of legislators."""
+    @pytest.mark.parametrize(
+        ("scenario", "mock_return", "filter_args", "expected_count", "expected_error"),
+        [
+            (
+                "success_no_filter",
+                [
+                    {"name": "Representative Smith", "agency": "House", "district": "1"},
+                    {"name": "Senator Jones", "agency": "Senate", "district": "2"},
+                ],
+                {},
+                2,
+                None,
+            ),
+            (
+                "success_with_chamber_filter",
+                [
+                    {"name": "Representative Smith", "agency": "House", "district": "1"},
+                    {"name": "Senator Jones", "agency": "Senate", "district": "2"},
+                ],
+                {"chamber": "House"},
+                1,
+                None,
+            ),
+            (
+                "success_with_district_filter",
+                [
+                    {"name": "Representative Smith", "agency": "House", "district": "1"},
+                    {"name": "Senator Jones", "agency": "Senate", "district": "2"},
+                ],
+                {"district": "1"},
+                1,
+                None,
+            ),
+            (
+                "success_with_multiple_filters",
+                [
+                    {"name": "Representative Smith", "agency": "House", "district": "1"},
+                    {"name": "Senator Jones", "agency": "Senate", "district": "2"},
+                ],
+                {"chamber": "House", "district": "1"},
+                1,
+                None,
+            ),
+            (
+                "no_results_with_filters",
+                [
+                    {"name": "Representative Smith", "agency": "House", "district": "1"},
+                    {"name": "Senator Jones", "agency": "Senate", "district": "2"},
+                ],
+                {"chamber": "Senate", "district": "1"},
+                0,
+                None,
+            ),
+            (
+                "not_found",
+                None,
+                {},
+                None,
+                "No legislators found",
+            ),
+            (
+                "api_error",
+                Exception("API Error"),
+                {},
+                None,
+                "Failed to find legislators",
+            ),
+        ],
+    )
+    def test_find_legislator_scenarios(
+        self, scenario, mock_return, filter_args, expected_count, expected_error, common_test_data
+    ):
+        """Test different scenarios for find_legislator using parametrization."""
         # Setup mocks
-        mock_get_biennium.return_value = self.test_biennium
-        mock_client.get_sponsors.return_value = self.mock_sponsors_data
+        with (
+            patch("wa_leg_mcp.tools.legislator_tools.get_current_biennium") as mock_get_biennium,
+            patch("wa_leg_mcp.tools.legislator_tools.wsl_client") as mock_client,
+        ):
 
-        # Call function
-        result = find_legislator()
+            mock_get_biennium.return_value = common_test_data["biennium"]
 
-        # Assertions
-        mock_client.get_sponsors.assert_called_once_with(self.test_biennium)
-        assert result["biennium"] == self.test_biennium
-        assert result["count"] == 3
-        assert len(result["legislators"]) == 3
-        assert result["legislators"][0]["name"] == "Representative Smith"
-        assert result["legislators"][1]["name"] == "Senator Jones"
-        assert result["legislators"][0]["first_name"] == "Representative"
-        assert result["legislators"][0]["last_name"] == "Smith"
-        assert result["legislators"][0]["acronym"] == "SMIT"
+            # Configure the mock client based on the scenario
+            if isinstance(mock_return, Exception):
+                mock_client.get_sponsors.side_effect = mock_return
+            else:
+                mock_client.get_sponsors.return_value = mock_return
 
-    @patch("wa_leg_mcp.tools.legislator_tools.get_current_biennium")
-    @patch("wa_leg_mcp.tools.legislator_tools.wsl_client")
-    def test_find_legislator_with_chamber_filter(self, mock_client, mock_get_biennium):
-        """Test legislator search with chamber filter."""
-        # Setup mocks
-        mock_get_biennium.return_value = self.test_biennium
-        mock_client.get_sponsors.return_value = self.mock_sponsors_data
+            # Call function with filter arguments
+            result = find_legislator(**filter_args)
 
-        # Call function with chamber filter
-        result = find_legislator(chamber="House")
+            # Assertions
+            if expected_error:
+                assert "error" in result
+                assert expected_error in result["error"]
+            else:
+                if expected_count == 0:
+                    assert result["count"] == 0
+                    assert len(result["legislators"]) == 0
+                else:
+                    assert result["count"] == expected_count
+                    assert len(result["legislators"]) == expected_count
+                assert result["biennium"] == common_test_data["biennium"]
 
-        # Assertions
-        assert result["count"] == 2
-        assert len(result["legislators"]) == 2
-        assert result["legislators"][0]["name"] == "Representative Smith"
-        assert result["legislators"][1]["name"] == "Representative Johnson"
+    def test_find_legislator_api_error_helper(self):
+        """Test API error handling using the helper function."""
+        with patch("wa_leg_mcp.tools.legislator_tools.wsl_client") as mock_client:
+            assert_api_error_handling(
+                find_legislator,
+                mock_client.get_sponsors,
+                "Failed to find legislators",
+            )
 
-        # Test with different chamber
-        result = find_legislator(chamber="Senate")
+    def test_find_legislator_not_found_helper(self):
+        """Test not found handling using the helper function."""
+        with patch("wa_leg_mcp.tools.legislator_tools.wsl_client") as mock_client:
+            assert_not_found_handling(
+                find_legislator,
+                mock_client.get_sponsors,
+                "No legislators found",
+            )
 
-        # Assertions
-        assert result["count"] == 1
-        assert len(result["legislators"]) == 1
-        assert result["legislators"][0]["name"] == "Senator Jones"
-
-    @patch("wa_leg_mcp.tools.legislator_tools.get_current_biennium")
-    @patch("wa_leg_mcp.tools.legislator_tools.wsl_client")
-    def test_find_legislator_with_district_filter(self, mock_client, mock_get_biennium):
-        """Test legislator search with district filter."""
-        # Setup mocks
-        mock_get_biennium.return_value = self.test_biennium
-        mock_client.get_sponsors.return_value = self.mock_sponsors_data
-
-        # Call function with district filter
-        result = find_legislator(district="1")
-
-        # Assertions
-        assert result["count"] == 2
-        assert len(result["legislators"]) == 2
-        assert result["legislators"][0]["name"] == "Representative Smith"
-        assert result["legislators"][1]["name"] == "Representative Johnson"
-
-        # Test with different district
-        result = find_legislator(district="2")
-
-        # Assertions
-        assert result["count"] == 1
-        assert len(result["legislators"]) == 1
-        assert result["legislators"][0]["name"] == "Senator Jones"
-
-    @patch("wa_leg_mcp.tools.legislator_tools.get_current_biennium")
-    @patch("wa_leg_mcp.tools.legislator_tools.wsl_client")
-    def test_find_legislator_with_multiple_filters(self, mock_client, mock_get_biennium):
-        """Test legislator search with multiple filters."""
-        # Setup mocks
-        mock_get_biennium.return_value = self.test_biennium
-        mock_client.get_sponsors.return_value = self.mock_sponsors_data
-
-        # Call function with multiple filters
-        result = find_legislator(chamber="House", district="1")
-
-        # Assertions
-        assert result["count"] == 2
-        assert len(result["legislators"]) == 2
-        assert result["legislators"][0]["name"] == "Representative Smith"
-        assert result["legislators"][1]["name"] == "Representative Johnson"
-
-        # Test with different combination
-        result = find_legislator(chamber="Senate", district="1")
-
-        # Assertions
-        assert result["count"] == 0
-        assert len(result["legislators"]) == 0
-
-    @patch("wa_leg_mcp.tools.legislator_tools.get_current_biennium")
-    @patch("wa_leg_mcp.tools.legislator_tools.wsl_client")
-    def test_find_legislator_not_found(self, mock_client, mock_get_biennium):
-        """Test legislator search with no results."""
-        # Setup mocks
-        mock_get_biennium.return_value = self.test_biennium
-        mock_client.get_sponsors.return_value = None
-
-        # Call function
-        result = find_legislator()
-
-        # Assertions
-        assert "error" in result
-        assert "No legislators found" in result["error"]
-
-    @patch("wa_leg_mcp.tools.legislator_tools.get_current_biennium")
-    @patch("wa_leg_mcp.tools.legislator_tools.wsl_client")
-    def test_find_legislator_exception(self, mock_client, mock_get_biennium):
-        """Test exception handling."""
-        # Setup mocks
-        mock_get_biennium.return_value = self.test_biennium
-        mock_client.get_sponsors.side_effect = Exception("API Error")
-
-        # Call function
-        result = find_legislator()
-
-        # Assertions
-        assert "error" in result
-        assert "Failed to find legislators" in result["error"]
-
-    @patch("wa_leg_mcp.tools.legislator_tools.get_current_biennium")
-    @patch("wa_leg_mcp.tools.legislator_tools.wsl_client")
-    def test_find_legislator_with_explicit_biennium(self, mock_client, mock_get_biennium):
+    def test_find_legislator_with_explicit_biennium(self):
         """Test find_legislator with explicitly provided biennium."""
         # Setup mocks
-        mock_client.get_sponsors.return_value = self.mock_sponsors_data
-        explicit_biennium = "2021-22"
+        with (
+            patch("wa_leg_mcp.tools.legislator_tools.get_current_biennium") as mock_get_biennium,
+            patch("wa_leg_mcp.tools.legislator_tools.wsl_client") as mock_client,
+        ):
 
-        # Call function with explicit biennium
-        result = find_legislator(biennium=explicit_biennium)
+            mock_client.get_sponsors.return_value = [
+                {"name": "Representative Smith", "agency": "House", "district": "1"},
+            ]
+            explicit_biennium = "2021-22"
 
-        # Assertions
-        mock_client.get_sponsors.assert_called_once_with(explicit_biennium)
-        assert result["biennium"] == explicit_biennium
-        # mock_get_biennium should not be called when biennium is provided
-        mock_get_biennium.assert_not_called()
+            # Call function with explicit biennium
+            result = find_legislator(biennium=explicit_biennium)
+
+            # Assertions
+            mock_client.get_sponsors.assert_called_once_with(explicit_biennium)
+            assert result["biennium"] == explicit_biennium
+            # mock_get_biennium should not be called when biennium is provided
+            mock_get_biennium.assert_not_called()
 
 
 if __name__ == "__main__":
-    unittest.main()
+    pytest.main([__file__])

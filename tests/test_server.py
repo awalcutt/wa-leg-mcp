@@ -1,5 +1,5 @@
 """
-Unit tests for the Washington State Legislature MCP Server
+Unit tests for the Washington State Legislature MCP Server organized by functionality
 """
 
 import importlib
@@ -85,7 +85,7 @@ def setup_mcp_mocks():
     return mock_mcp
 
 
-# Setup mocks before importing
+# Setup mocks before importing the module under test to ensure module-level code uses our mocks
 mock_mcp = setup_mcp_mocks()
 
 # Import the module under test
@@ -369,7 +369,7 @@ class TestMainEntryPoint(TestBase):
             patch("wa_leg_mcp.server.create_server"),
         ):
             main()
-            # If we get here without exceptions, the test passes
+            # If we get here without exceptions (like ImportError or AttributeError from missing dependencies), the test passes
 
 
 if __name__ == "__main__":

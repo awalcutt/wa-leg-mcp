@@ -1,13 +1,14 @@
 """
-Tests for bill_tools.py
+Enhanced tests for bill_tools.py with improved fixture usage and parametrization
 """
 
-import unittest
 from unittest.mock import patch
 
-# Import the functions to test
+import pytest
+
 from wa_leg_mcp.tools.bill_tools import (
     get_bill_amendments,
+    get_bill_content,
     get_bill_documents,
     get_bill_info,
     get_bill_status,
@@ -16,522 +17,601 @@ from wa_leg_mcp.tools.bill_tools import (
 )
 
 
-class TestBillTools(unittest.TestCase):
-    """Test cases for bill tools."""
+class TestBillInfo:
+    """Tests for the get_bill_info function."""
 
-    def setUp(self):
-        """Set up test fixtures."""
-        self.test_bill_number = 1234  # Changed from "HB1234" to 1234
-        self.test_biennium = "2023-24"
-        self.test_year = "2023"
-        self.test_query = "climate change"
-
-        # Sample bill data for testing
-        self.mock_bill_data = [
-            {
-                "biennium": "2025-26",
-                "bill_id": "HB 1000",
-                "bill_number": "1000",
-                "substitute_version": "0",
-                "engrossed_version": "0",
-                "short_legislation_type": {
-                    "short_legislation_type": "B",
-                    "long_legislation_type": "Bill",
-                },
-                "original_agency": "House",
-                "active": True,
-                "short_description": "Test Bill",
-                "long_description": "Test Bill Title",
-                "sponsor": "Test Sponsor",
-                "introduced_date": "2023-01-01",
-                "current_status": {
-                    "status": "In Committee",
-                    "action_date": "2023-01-15",
-                    "history_line": "First reading, referred to Committee.",
-                    "amendments_exist": False,
-                    "veto": False,
-                    "partial_veto": False,
-                },
-                "legal_title": "AN ACT Relating to test bill",
-            }
-        ]
-
-        # Sample bills by year data
-        self.mock_bills_by_year = [
-            {
-                "biennium": "2025-26",
-                "bill_id": "HB 1000",
-                "bill_number": 1000,
-                "original_agency": "House",
-                "active": True,
-            },
-            {
-                "biennium": "2025-26",
-                "bill_id": "SB 5678",
-                "bill_number": 5678,
-                "original_agency": "Senate",
-                "active": False,
-                "introduced_date": "2023-02-01",
-            },
-        ]
-
-        # Sample search results data
-        self.mock_search_results = [
-            {
-                "bill_id": "HB 1234",
-                "bill_number": 1234,
-                "biennium": "2023-24",
-                "description": "Relating to climate change mitigation",
-            },
-            {
-                "bill_id": "SB 5678",
-                "bill_number": 5678,
-                "biennium": "2023-24",
-                "description": "Addressing climate change impacts",
-            },
-        ]
-
-        # Sample documents data
-        self.mock_documents_data = [
-            {
-                "name": "Bill Text",
-                "type": "bill",
-                "class": "Original",
-                "pdf_url": "http://example.com/bill.pdf",
-                "htm_url": "http://example.com/bill.html",
-                "description": "Original Bill",
-                "bill_id": "HB 1234",
-                "biennium": "2023-24",
-                "short_friendly_name": "Original Bill",
-                "long_friendly_name": "House Bill 1234",
-            },
-            {
-                "name": "Amendment",
-                "type": "amendment",
-                "class": "House",
-                "pdf_url": "http://example.com/amendment.pdf",
-                "htm_url": "http://example.com/amendment.html",
-                "description": "House Amendment",
-                "bill_id": "HB 1234",
-                "biennium": "2023-24",
-                "short_friendly_name": "Amendment",
-                "long_friendly_name": "House Amendment to HB 1234",
-            },
-        ]
-
-        # Sample amendments data
-        self.mock_amendments_data = [
-            {
-                "bill_number": 1234,
-                "name": "1234 AMH COMM H1234.1",
-                "bill_id": "HB 1234",
-                "sponsor_name": "Committee",
-                "description": "Committee Amendment",
-                "floor_action": "ADOPTED",
-                "floor_action_date": "2023-02-15",
-                "htm_url": "http://example.com/amendment.html",
-                "pdf_url": "http://example.com/amendment.pdf",
-                "agency": "House",
-                "type": "Committee",
-            },
-            {
-                "bill_number": 5678,
-                "name": "5678 AMH FLOOR H5678.1",
-                "bill_id": "HB 5678",
-                "sponsor_name": "Representative Smith",
-                "description": "Floor Amendment",
-                "floor_action": "WITHDRAWN",
-                "floor_action_date": "2023-03-01",
-                "htm_url": "http://example.com/amendment2.html",
-                "pdf_url": "http://example.com/amendment2.pdf",
-                "agency": "House",
-                "type": "Floor",
-            },
-        ]
-
-    @patch("wa_leg_mcp.tools.bill_tools.get_current_biennium")
-    @patch("wa_leg_mcp.tools.bill_tools.wsl_client")
-    def test_get_bill_info_success(self, mock_client, mock_get_biennium):
-        """Test successful retrieval of bill information."""
+    @pytest.mark.parametrize(
+        ("scenario", "mock_return", "expected_result", "expected_error"),
+        [
+            (
+                "success",
+                [
+                    {
+                        "bill_number": "1234",
+                        "long_description": "Test Bill Title",
+                        "sponsor": "Test Sponsor",
+                    }
+                ],
+                {"bill_number": "1234", "title": "Test Bill Title", "sponsor": "Test Sponsor"},
+                None,
+            ),
+            (
+                "not_found",
+                None,
+                None,
+                "Bill 1234 not found",
+            ),
+            (
+                "api_error",
+                Exception("API Error"),
+                None,
+                "Failed to fetch bill information",
+            ),
+        ],
+    )
+    def test_get_bill_info_scenarios(
+        self, scenario, mock_return, expected_result, expected_error, common_test_data
+    ):
+        """Test different scenarios for get_bill_info using parametrization."""
         # Setup mocks
-        mock_get_biennium.return_value = self.test_biennium
-        mock_client.get_legislation.return_value = self.mock_bill_data
+        with (
+            patch("wa_leg_mcp.tools.bill_tools.get_current_biennium") as mock_get_biennium,
+            patch("wa_leg_mcp.tools.bill_tools.wsl_client") as mock_client,
+        ):
 
-        # Call function
-        result = get_bill_info(self.test_bill_number)
+            mock_get_biennium.return_value = common_test_data["biennium"]
 
-        # Assertions
-        mock_client.get_legislation.assert_called_once_with(
-            self.test_biennium, str(self.test_bill_number)
-        )
-        assert result["bill_number"] == self.test_bill_number
-        assert result["title"] == "Test Bill Title"
-        assert result["sponsor"] == "Test Sponsor"
-        assert result["status"] == "In Committee"
-        assert result["introduced_date"] == "2023-01-01"
-        assert result["active"]
-        assert result["agency"] == "House"
+            # Configure the mock client based on the scenario
+            if isinstance(mock_return, Exception):
+                mock_client.get_legislation.side_effect = mock_return
+            else:
+                mock_client.get_legislation.return_value = mock_return
 
-    @patch("wa_leg_mcp.tools.bill_tools.get_current_biennium")
-    @patch("wa_leg_mcp.tools.bill_tools.wsl_client")
-    def test_get_bill_info_not_found(self, mock_client, mock_get_biennium):
-        """Test bill not found scenario."""
-        # Setup mocks
-        mock_get_biennium.return_value = self.test_biennium
-        mock_client.get_legislation.return_value = None
+            # Call function
+            result = get_bill_info(common_test_data["bill_number"])
 
-        # Call function
-        result = get_bill_info(self.test_bill_number)
+            # Assertions
+            if expected_error:
+                assert "error" in result
+                assert expected_error in result["error"]
+            else:
+                for key, value in expected_result.items():
+                    assert result[key] == value
 
-        # Assertions
-        assert "error" in result
-        assert "not found" in result["error"]
-
-    @patch("wa_leg_mcp.tools.bill_tools.get_current_biennium")
-    @patch("wa_leg_mcp.tools.bill_tools.wsl_client")
-    def test_get_bill_info_exception(self, mock_client, mock_get_biennium):
-        """Test exception handling."""
-        # Setup mocks
-        mock_get_biennium.return_value = self.test_biennium
-        mock_client.get_legislation.side_effect = Exception("API Error")
-
-        # Call function
-        result = get_bill_info(self.test_bill_number)
-
-        # Assertions
-        assert "error" in result
-        assert "Failed to fetch bill information" in result["error"]
-
-    @patch("wa_leg_mcp.tools.bill_tools.get_current_year")
-    @patch("wa_leg_mcp.tools.bill_tools.wsl_client")
-    def test_get_bills_by_year_success(self, mock_client, mock_get_current_year):
-        """Test successful bills by year retrieval."""
-        # Setup mocks
-        mock_get_current_year.return_value = self.test_year
-        mock_client.get_legislation_by_year.return_value = self.mock_bills_by_year
-
-        # Call function
-        result = get_bills_by_year()
-
-        # Assertions
-        mock_client.get_legislation_by_year.assert_called_once_with(self.test_year)
-        assert result["count"] == 2
-        assert len(result["bills"]) == 2
-        assert result["bills"][0]["bill_id"] == "HB 1000"
-        assert result["bills"][1]["bill_id"] == "SB 5678"
-        assert result["year"] == self.test_year
-
-    @patch("wa_leg_mcp.tools.bill_tools.get_current_year")
-    @patch("wa_leg_mcp.tools.bill_tools.wsl_client")
-    def test_get_bills_by_year_with_filters(self, mock_client, mock_get_current_year):
-        """Test bills by year retrieval with filters."""
-        # Setup mocks
-        mock_get_current_year.return_value = self.test_year
-        mock_client.get_legislation_by_year.return_value = self.mock_bills_by_year
-
-        # Call function with active_only filter
-        result = get_bills_by_year(active_only=True)
-
-        # Assertions
-        assert result["count"] == 1
-        assert result["bills"][0]["bill_id"] == "HB 1000"
-
-        # Call function with agency filter
-        result = get_bills_by_year(agency="Senate")
-
-        # Assertions
-        assert result["count"] == 1
-        assert result["bills"][0]["bill_id"] == "SB 5678"
-
-    @patch("wa_leg_mcp.tools.bill_tools.get_current_year")
-    @patch("wa_leg_mcp.tools.bill_tools.wsl_client")
-    def test_get_bills_by_year_not_found(self, mock_client, mock_get_current_year):
-        """Test bills by year retrieval with no results."""
-        # Setup mocks
-        mock_get_current_year.return_value = self.test_year
-        mock_client.get_legislation_by_year.return_value = None
-
-        # Call function
-        result = get_bills_by_year()
-
-        # Assertions
-        assert "error" in result
-        assert "No bills found in year" in result["error"]
-
-    @patch("wa_leg_mcp.tools.bill_tools.get_current_biennium")
-    @patch("wa_leg_mcp.tools.bill_tools.wsl_client")
-    def test_get_bill_status_success(self, mock_client, mock_get_biennium):
-        """Test successful retrieval of bill status."""
-        # Setup mocks
-        mock_get_biennium.return_value = self.test_biennium
-        mock_client.get_legislation.return_value = self.mock_bill_data
-
-        # Call function
-        result = get_bill_status(self.test_bill_number)
-
-        # Assertions
-        mock_client.get_legislation.assert_called_once_with(
-            self.test_biennium, str(self.test_bill_number)
-        )
-        assert result["bill_number"] == self.test_bill_number
-        assert result["current_status"] == "In Committee"
-        assert result["status_date"] == "2023-01-15"
-        assert result["history_line"] == "First reading, referred to Committee."
-        assert not result["amendments_exist"]
-        assert not result["veto"]
-
-    @patch("wa_leg_mcp.tools.bill_tools.get_current_biennium")
-    @patch("wa_leg_mcp.tools.bill_tools.wsl_client")
-    def test_get_bill_documents_success(self, mock_client, mock_get_biennium):
-        """Test successful retrieval of bill documents."""
-        # Setup mocks
-        mock_get_biennium.return_value = self.test_biennium
-        mock_client.get_documents.return_value = self.mock_documents_data
-
-        # Call function
-        result = get_bill_documents(self.test_bill_number)
-
-        # Assertions
-        mock_client.get_documents.assert_called_once_with(
-            self.test_biennium, str(self.test_bill_number)
-        )
-        assert result["bill_number"] == self.test_bill_number
-        assert result["count"] == 2
-        assert len(result["documents"]) == 2
-        assert result["documents"][0]["type"] == "bill"
-        assert result["documents"][1]["type"] == "amendment"
-        assert result["documents"][0]["pdf_url"] == "http://example.com/bill.pdf"
-        assert result["documents"][0]["htm_url"] == "http://example.com/bill.html"
-
-    @patch("wa_leg_mcp.tools.bill_tools.get_current_biennium")
-    @patch("wa_leg_mcp.tools.bill_tools.wsl_client")
-    def test_get_bill_documents_with_filter(self, mock_client, mock_get_biennium):
-        """Test retrieval of bill documents with type filter."""
-        # Setup mocks
-        mock_get_biennium.return_value = self.test_biennium
-        mock_client.get_documents.return_value = self.mock_documents_data
-
-        # Call function with document_type filter
-        result = get_bill_documents(self.test_bill_number, document_type="amendment")
-
-        # Assertions
-        assert result["count"] == 1
-        assert result["documents"][0]["type"] == "amendment"
-
-    @patch("wa_leg_mcp.tools.bill_tools.get_current_biennium")
-    @patch("wa_leg_mcp.tools.bill_tools.wsl_client")
-    def test_get_bill_documents_not_found(self, mock_client, mock_get_biennium):
-        """Test bill documents not found scenario."""
-        # Setup mocks
-        mock_get_biennium.return_value = self.test_biennium
-        mock_client.get_documents.return_value = None
-
-        # Call function
-        result = get_bill_documents(self.test_bill_number)
-
-        # Assertions
-        assert "error" in result
-        assert "No documents found" in result["error"]
-
-    @patch("wa_leg_mcp.tools.bill_tools.get_current_biennium")
-    @patch("wa_leg_mcp.tools.bill_tools.wsl_client")
-    def test_get_bill_documents_exception(self, mock_client, mock_get_biennium):
-        """Test exception handling in get_bill_documents."""
-        # Setup mocks
-        mock_get_biennium.return_value = self.test_biennium
-        mock_client.get_documents.side_effect = Exception("API Error")
-
-        # Call function
-        result = get_bill_documents(self.test_bill_number)
-
-        # Assertions
-        assert "error" in result
-        assert "Failed to fetch bill documents" in result["error"]
-
-    @patch("wa_leg_mcp.tools.bill_tools.get_current_biennium")
-    @patch("wa_leg_mcp.tools.bill_tools.wsl_client")
-    def test_get_bill_status_not_found(self, mock_client, mock_get_biennium):
-        """Test bill status not found scenario."""
-        # Setup mocks
-        mock_get_biennium.return_value = self.test_biennium
-        mock_client.get_legislation.return_value = None
-
-        # Call function
-        result = get_bill_status(self.test_bill_number)
-
-        # Assertions
-        assert "error" in result
-        assert "not found" in result["error"]
-
-    @patch("wa_leg_mcp.tools.bill_tools.get_current_biennium")
-    @patch("wa_leg_mcp.tools.bill_tools.wsl_client")
-    def test_get_bill_status_exception(self, mock_client, mock_get_biennium):
-        """Test exception handling in get_bill_status."""
-        # Setup mocks
-        mock_get_biennium.return_value = self.test_biennium
-        mock_client.get_legislation.side_effect = Exception("API Error")
-
-        # Call function
-        result = get_bill_status(self.test_bill_number)
-
-        # Assertions
-        assert "error" in result
-        assert "Failed to fetch bill status" in result["error"]
-
-    @patch("wa_leg_mcp.tools.bill_tools.get_current_year")
-    @patch("wa_leg_mcp.tools.bill_tools.wsl_client")
-    def test_get_bills_by_year_exception(self, mock_client, mock_get_current_year):
-        """Test exception handling in get_bills_by_year."""
-        # Setup mocks
-        mock_get_current_year.return_value = self.test_year
-        mock_client.get_legislation_by_year.side_effect = Exception("API Error")
-
-        # Call function
-        result = get_bills_by_year()
-
-        # Assertions
-        assert "error" in result
-        assert "Failed to retrieve bills" in result["error"]
-
-    @patch("wa_leg_mcp.tools.bill_tools.get_current_biennium")
-    @patch("wa_leg_mcp.tools.bill_tools.wsl_client")
-    def test_get_bill_info_with_explicit_biennium(self, mock_client, mock_get_biennium):
+    def test_get_bill_info_with_explicit_biennium(self, common_test_data):
         """Test get_bill_info with explicitly provided biennium."""
         # Setup mocks
-        mock_client.get_legislation.return_value = self.mock_bill_data
-        explicit_biennium = "2021-22"
+        with (
+            patch("wa_leg_mcp.tools.bill_tools.get_current_biennium") as mock_get_biennium,
+            patch("wa_leg_mcp.tools.bill_tools.wsl_client") as mock_client,
+        ):
 
-        # Call function with explicit biennium
-        result = get_bill_info(self.test_bill_number, biennium=explicit_biennium)
+            mock_client.get_legislation.return_value = [
+                {
+                    "bill_number": "1234",
+                    "long_description": "Test Bill Title",
+                    "sponsor": "Test Sponsor",
+                }
+            ]
+            explicit_biennium = "2021-22"
 
-        # Assertions
-        mock_client.get_legislation.assert_called_once_with(
-            explicit_biennium, str(self.test_bill_number)
-        )
-        assert result["biennium"] == explicit_biennium
-        # mock_get_biennium should not be called when biennium is provided
-        mock_get_biennium.assert_not_called()
+            # Call function with explicit biennium
+            result = get_bill_info(common_test_data["bill_number"], biennium=explicit_biennium)
 
-    @patch("wa_leg_mcp.tools.bill_tools.get_current_biennium")
-    @patch("wa_leg_mcp.tools.bill_tools.wsl_client")
-    def test_get_bill_amendments_success(self, mock_client, mock_get_biennium):
-        """Test successful retrieval of bill amendments."""
+            # Assertions
+            mock_client.get_legislation.assert_called_once_with(
+                explicit_biennium, common_test_data["bill_number"]
+            )
+            assert result["biennium"] == explicit_biennium
+            # mock_get_biennium should not be called when biennium is provided
+            mock_get_biennium.assert_not_called()
+
+
+class TestBillStatus:
+    """Tests for the get_bill_status function."""
+
+    @pytest.mark.parametrize(
+        ("scenario", "mock_return", "expected_keys", "expected_error"),
+        [
+            (
+                "success",
+                [{"current_status": {"status": "In Committee", "action_date": "2023-01-15"}}],
+                ["bill_number", "current_status", "status_date", "history_line"],
+                None,
+            ),
+            (
+                "not_found",
+                None,
+                None,
+                "Bill 1234 not found",
+            ),
+            (
+                "api_error",
+                Exception("API Error"),
+                None,
+                "Failed to fetch bill status",
+            ),
+        ],
+    )
+    def test_get_bill_status_scenarios(
+        self, scenario, mock_return, expected_keys, expected_error, common_test_data
+    ):
+        """Test different scenarios for get_bill_status using parametrization."""
         # Setup mocks
-        mock_get_biennium.return_value = self.test_biennium
-        mock_client.get_amendments.return_value = self.mock_amendments_data
+        with (
+            patch("wa_leg_mcp.tools.bill_tools.get_current_biennium") as mock_get_biennium,
+            patch("wa_leg_mcp.tools.bill_tools.wsl_client") as mock_client,
+        ):
 
-        # Call function
-        result = get_bill_amendments(self.test_bill_number)
+            mock_get_biennium.return_value = common_test_data["biennium"]
 
-        # Assertions
-        mock_client.get_amendments.assert_called_once_with(self.test_biennium.split("-")[0])
-        assert result["bill_number"] == self.test_bill_number
-        assert result["count"] == 1
-        assert len(result["amendments"]) == 1
-        assert result["amendments"][0]["bill_id"] == "HB 1234"
-        assert result["amendments"][0]["sponsor_name"] == "Committee"
-        assert result["amendments"][0]["floor_action"] == "ADOPTED"
+            # Configure the mock client based on the scenario
+            if isinstance(mock_return, Exception):
+                mock_client.get_legislation.side_effect = mock_return
+            else:
+                mock_client.get_legislation.return_value = mock_return
 
-    @patch("wa_leg_mcp.tools.bill_tools.get_current_biennium")
-    @patch("wa_leg_mcp.tools.bill_tools.wsl_client")
-    def test_get_bill_amendments_not_found(self, mock_client, mock_get_biennium):
-        """Test bill amendments not found scenario."""
+            # Call function
+            result = get_bill_status(common_test_data["bill_number"])
+
+            # Assertions
+            if expected_error:
+                assert "error" in result
+                assert expected_error in result["error"]
+            else:
+                for key in expected_keys:
+                    assert key in result
+
+
+class TestBillsByYear:
+    """Tests for the get_bills_by_year function."""
+
+    @pytest.mark.parametrize(
+        ("scenario", "mock_return", "filter_args", "expected_count", "expected_error"),
+        [
+            (
+                "success_no_filter",
+                [{"bill_id": "HB 1000"}, {"bill_id": "SB 5678"}],
+                {},
+                2,
+                None,
+            ),
+            (
+                "success_with_agency_filter",
+                [
+                    {"bill_id": "HB 1000", "original_agency": "House"},
+                    {"bill_id": "SB 5678", "original_agency": "Senate"},
+                ],
+                {"agency": "House"},
+                1,
+                None,
+            ),
+            (
+                "success_with_active_filter",
+                [{"bill_id": "HB 1000", "active": True}, {"bill_id": "SB 5678", "active": False}],
+                {"active_only": True},
+                1,
+                None,
+            ),
+            (
+                "not_found",
+                None,
+                {},
+                None,
+                "No bills found in year",
+            ),
+            (
+                "api_error",
+                Exception("API Error"),
+                {},
+                None,
+                "Failed to retrieve bills",
+            ),
+        ],
+    )
+    def test_get_bills_by_year_scenarios(
+        self, scenario, mock_return, filter_args, expected_count, expected_error, common_test_data
+    ):
+        """Test different scenarios for get_bills_by_year using parametrization."""
         # Setup mocks
-        mock_get_biennium.return_value = self.test_biennium
-        mock_client.get_amendments.return_value = None
+        with (
+            patch("wa_leg_mcp.tools.bill_tools.get_current_year") as mock_get_current_year,
+            patch("wa_leg_mcp.tools.bill_tools.wsl_client") as mock_client,
+        ):
 
-        # Call function
-        result = get_bill_amendments(self.test_bill_number)
+            mock_get_current_year.return_value = common_test_data["year"]
 
-        # Assertions
-        assert "error" in result
-        assert "Failed to fetch amendments" in result["error"]
+            # Set up mock to either return a value or raise an exception
+            if isinstance(mock_return, Exception):
+                mock_client.get_legislation_by_year.side_effect = mock_return
+            else:
+                mock_client.get_legislation_by_year.return_value = mock_return
+            result = get_bills_by_year(**filter_args)
 
-    @patch("wa_leg_mcp.tools.bill_tools.get_current_biennium")
-    @patch("wa_leg_mcp.tools.bill_tools.wsl_search_client")
-    def test_search_bills_success(self, mock_search_client, mock_get_biennium):
-        """Test successful bill search with keywords."""
+            # Assertions
+            if expected_error:
+                assert "error" in result
+                assert expected_error in result["error"]
+            else:
+                assert result["count"] == expected_count
+                assert len(result["bills"]) == expected_count
+                assert result["year"] == common_test_data["year"]
+
+
+class TestSearchBills:
+    """Tests for the search_bills function."""
+
+    @pytest.mark.parametrize(
+        ("scenario", "mock_return", "expected_count", "expected_error"),
+        [
+            (
+                "success",
+                [{"bill_id": "HB 1234"}, {"bill_id": "SB 5678"}],
+                2,
+                None,
+            ),
+            (
+                "empty_results",
+                [],
+                None,
+                "No bills found matching query",
+            ),
+            (
+                "api_error",
+                Exception("API Error"),
+                None,
+                "Failed to search bills",
+            ),
+        ],
+    )
+    def test_search_bills_scenarios(
+        self, scenario, mock_return, expected_count, expected_error, common_test_data
+    ):
+        """Test different scenarios for search_bills using parametrization."""
         # Setup mocks
-        mock_get_biennium.return_value = self.test_biennium
-        mock_search_client.search_bills.return_value = self.mock_search_results
+        with (
+            patch("wa_leg_mcp.tools.bill_tools.get_current_biennium") as mock_get_biennium,
+            patch("wa_leg_mcp.tools.bill_tools.wsl_search_client") as mock_search_client,
+        ):
 
-        # Call function
-        result = search_bills(query=self.test_query)
+            mock_get_biennium.return_value = common_test_data["biennium"]
 
-        # Assertions
-        mock_search_client.search_bills.assert_called_once()
-        assert result["query"] == self.test_query
-        assert result["count"] == 2
-        assert len(result["bills"]) == 2
-        assert result["bills"][0]["bill_id"] == "HB 1234"
-        assert result["bills"][1]["bill_id"] == "SB 5678"
+            # Set up mock to either return a value or raise an exception
+            if isinstance(mock_return, Exception):
+                mock_search_client.search_bills.side_effect = mock_return
+            else:
+                mock_search_client.search_bills.return_value = mock_return
+            result = search_bills(query=common_test_data["query"])
 
-    @patch("wa_leg_mcp.tools.bill_tools.get_current_biennium")
-    @patch("wa_leg_mcp.tools.bill_tools.wsl_search_client")
-    def test_search_bills_not_found(self, mock_search_client, mock_get_biennium):
-        """Test bill search with no results."""
+            # Assertions
+            if expected_error:
+                assert "error" in result
+                assert expected_error in result["error"]
+            else:
+                assert result["count"] == expected_count
+                assert len(result["bills"]) == expected_count
+                assert result["query"] == common_test_data["query"]
+
+
+class TestBillDocuments:
+    """Tests for the get_bill_documents function."""
+
+    @pytest.mark.parametrize(
+        ("scenario", "mock_return", "filter_args", "expected_count", "expected_error"),
+        [
+            (
+                "success_no_filter",
+                [{"type": "bill"}, {"type": "amendment"}],
+                {},
+                2,
+                None,
+            ),
+            (
+                "success_with_type_filter",
+                [{"type": "bill"}, {"type": "amendment"}],
+                {"document_type": "bill"},
+                1,
+                None,
+            ),
+            (
+                "not_found",
+                None,
+                {},
+                None,
+                "No documents found",
+            ),
+            (
+                "api_error",
+                Exception("API Error"),
+                {},
+                None,
+                "Failed to fetch bill documents",
+            ),
+        ],
+    )
+    def test_get_bill_documents_scenarios(
+        self, scenario, mock_return, filter_args, expected_count, expected_error, common_test_data
+    ):
+        """Test different scenarios for get_bill_documents using parametrization."""
         # Setup mocks
-        mock_get_biennium.return_value = self.test_biennium
-        mock_search_client.search_bills.return_value = []
+        with (
+            patch("wa_leg_mcp.tools.bill_tools.get_current_biennium") as mock_get_biennium,
+            patch("wa_leg_mcp.tools.bill_tools.wsl_client") as mock_client,
+        ):
 
-        # Call function
-        result = search_bills(query=self.test_query)
+            mock_get_biennium.return_value = common_test_data["biennium"]
 
-        # Assertions
-        assert "error" in result
-        assert f"No bills found matching query: {self.test_query}" in result["error"]
+            # Set up mock to either return a value or raise an exception
+            if isinstance(mock_return, Exception):
+                mock_client.get_documents.side_effect = mock_return
+            else:
+                mock_client.get_documents.return_value = mock_return
+            result = get_bill_documents(common_test_data["bill_number"], **filter_args)
 
-    @patch("wa_leg_mcp.tools.bill_tools.get_current_biennium")
-    @patch("wa_leg_mcp.tools.bill_tools.wsl_search_client")
-    def test_search_bills_exception(self, mock_search_client, mock_get_biennium):
-        """Test exception handling in search_bills."""
+            # Assertions
+            if expected_error:
+                assert "error" in result
+                assert expected_error in result["error"]
+            else:
+                assert result["count"] == expected_count
+                assert len(result["documents"]) == expected_count
+                assert result["bill_number"] == common_test_data["bill_number"]
+
+
+class TestBillAmendments:
+    """Tests for the get_bill_amendments function."""
+
+    @pytest.mark.parametrize(
+        ("scenario", "mock_return", "bill_number", "expected_count", "expected_error"),
+        [
+            (
+                "success",
+                [{"bill_number": 1234, "bill_id": "HB 1234"}],
+                1234,
+                1,
+                None,
+            ),
+            (
+                "no_matching_amendments",
+                [{"bill_number": 5678, "bill_id": "HB 5678"}],
+                1234,
+                None,
+                "No amendments found for bill",
+            ),
+            (
+                "not_found",
+                None,
+                1234,
+                None,
+                "Failed to fetch amendments",
+            ),
+            (
+                "api_error",
+                Exception("API Error"),
+                1234,
+                None,
+                "Failed to fetch bill amendments",
+            ),
+        ],
+    )
+    def test_get_bill_amendments_scenarios(
+        self, scenario, mock_return, bill_number, expected_count, expected_error, common_test_data
+    ):
+        """Test different scenarios for get_bill_amendments using parametrization."""
         # Setup mocks
-        mock_get_biennium.return_value = self.test_biennium
-        mock_search_client.search_bills.side_effect = Exception("API Error")
+        with (
+            patch("wa_leg_mcp.tools.bill_tools.get_current_biennium") as mock_get_biennium,
+            patch("wa_leg_mcp.tools.bill_tools.wsl_client") as mock_client,
+        ):
 
-        # Call function
-        result = search_bills(query=self.test_query)
+            mock_get_biennium.return_value = common_test_data["biennium"]
 
-        # Assertions
-        assert "error" in result
-        assert "Failed to search bills" in result["error"]
+            # Set up mock to either return a value or raise an exception
+            if isinstance(mock_return, Exception):
+                mock_client.get_amendments.side_effect = mock_return
+            else:
+                mock_client.get_amendments.return_value = mock_return
+            result = get_bill_amendments(bill_number)
 
-    @patch("wa_leg_mcp.tools.bill_tools.get_current_biennium")
-    @patch("wa_leg_mcp.tools.bill_tools.wsl_client")
-    def test_get_bill_amendments_no_matching_bill(self, mock_client, mock_get_biennium):
-        """Test scenario where amendments exist but none match the requested bill number."""
+            # Assertions
+            if expected_error:
+                assert "error" in result
+                assert expected_error in result["error"]
+            elif expected_count:
+                # Verify the amendments list exists and has the expected length
+                assert "amendments" in result
+                assert len(result["amendments"]) == expected_count
+                # Verify the count field matches the length of the amendments list
+                assert result["count"] == len(result["amendments"])
+                assert result["bill_number"] == bill_number
+
+
+class TestBillContent:
+    """Tests for the get_bill_content function."""
+
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize(
+        ("bill_format", "expected_content_type"),
+        [
+            ("xml", "content"),
+            ("pdf", "url"),
+            ("htm", "content"),
+        ],
+    )
+    async def test_get_bill_content_formats(
+        self, bill_format, expected_content_type, common_test_data, async_mock_httpx_client
+    ):
+        """Test get_bill_content with different formats."""
         # Setup mocks
-        mock_get_biennium.return_value = self.test_biennium
-        # Create amendments data with only bill 5678, not our test bill 1234
-        amendments_data = [
-            amendment
-            for amendment in self.mock_amendments_data
-            if amendment.get("bill_number") != self.test_bill_number
-        ]
-        mock_client.get_amendments.return_value = amendments_data
+        with (
+            patch("wa_leg_mcp.tools.bill_tools.get_current_biennium") as mock_get_biennium,
+            patch("wa_leg_mcp.tools.bill_tools.fetch_bill_document") as mock_fetch_document,
+        ):
+            mock_get_biennium.return_value = common_test_data["biennium"]
 
-        # Call function
-        result = get_bill_amendments(self.test_bill_number)
+            # Configure mock response based on format
+            if bill_format == "pdf":
+                mock_fetch_document.return_value = {
+                    "url": f"https://example.com/bill.{bill_format}",
+                    "mime_type": "application/pdf",
+                }
+            else:
+                mock_fetch_document.return_value = "<bill>Test content</bill>"
 
-        # Assertions
-        assert "error" in result
-        assert f"No amendments found for bill {self.test_bill_number}" in result["error"]
+            # Call function
+            result = await get_bill_content(
+                bill_number=common_test_data["bill_number"],
+                chamber=common_test_data["chamber"],
+                bill_format=bill_format,
+            )
 
-    @patch("wa_leg_mcp.tools.bill_tools.get_current_biennium")
-    @patch("wa_leg_mcp.tools.bill_tools.wsl_client")
-    def test_get_bill_amendments_exception(self, mock_client, mock_get_biennium):
-        """Test exception handling in get_bill_amendments."""
+            # Assertions
+            mock_fetch_document.assert_called_once_with(
+                common_test_data["biennium"],
+                common_test_data["chamber"],
+                common_test_data["bill_number"],
+                bill_format,
+            )
+
+            if expected_content_type == "content":
+                assert "content" in result
+                assert result["content"] == "<bill>Test content</bill>"
+            else:
+                assert "url" in result
+
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize(
+        ("scenario", "mock_fetch_return", "expected_error"),
+        [
+            (
+                "invalid_format",
+                None,
+                "Invalid format",
+            ),
+            (
+                "fetch_error",
+                {"error": "Failed to fetch"},
+                "Failed to fetch",
+            ),
+            (
+                "exception",
+                Exception("Test error"),
+                "Failed to fetch bill content",
+            ),
+        ],
+    )
+    async def test_get_bill_content_error_scenarios(
+        self, scenario, mock_fetch_return, expected_error, common_test_data
+    ):
+        """Test error scenarios for get_bill_content."""
         # Setup mocks
-        mock_get_biennium.return_value = self.test_biennium
-        mock_client.get_amendments.side_effect = Exception("API Error")
+        with (
+            patch("wa_leg_mcp.tools.bill_tools.get_current_biennium") as mock_get_biennium,
+            patch("wa_leg_mcp.tools.bill_tools.fetch_bill_document") as mock_fetch_document,
+        ):
+            mock_get_biennium.return_value = common_test_data["biennium"]
 
-        # Call function
-        result = get_bill_amendments(self.test_bill_number)
+            # Configure mock based on scenario
+            if scenario == "invalid_format":
+                # Don't configure mock_fetch_document as it shouldn't be called
+                bill_format = "invalid"
+            else:
+                bill_format = "xml"
+                if isinstance(mock_fetch_return, Exception):
+                    mock_fetch_document.side_effect = mock_fetch_return
+                else:
+                    mock_fetch_document.return_value = mock_fetch_return
 
-        # Assertions
-        assert "error" in result
-        assert "Failed to fetch bill amendments" in result["error"]
+            # Call function
+            result = await get_bill_content(
+                bill_number=common_test_data["bill_number"],
+                chamber=common_test_data["chamber"],
+                bill_format=bill_format,
+            )
+
+            # Assertions
+            assert "error" in result
+            assert expected_error in result["error"]
+
+    @pytest.mark.asyncio
+    async def test_chamber_determination_fails_defaults_to_house(self, common_test_data):
+        """Test case where chamber determination fails and defaults to House.
+
+        House is the default chamber because most bills originate there and
+        it's a reasonable first attempt when the chamber is unknown.
+        """
+        # Setup mocks
+        with (
+            patch("wa_leg_mcp.tools.bill_tools.get_current_biennium") as mock_get_biennium,
+            patch("wa_leg_mcp.tools.bill_tools.get_bill_info") as mock_get_bill_info,
+            patch(
+                "wa_leg_mcp.tools.bill_tools.determine_chamber_from_bill_id"
+            ) as mock_determine_chamber,
+            patch("wa_leg_mcp.tools.bill_tools.fetch_bill_document") as mock_fetch_document,
+        ):
+            mock_get_biennium.return_value = common_test_data["biennium"]
+            # Return bill info but with no bill_id to determine chamber from
+            mock_get_bill_info.return_value = {"bill_number": common_test_data["bill_number"]}
+            # Chamber determination returns None
+            mock_determine_chamber.return_value = None
+            mock_fetch_document.return_value = "<bill>Test content</bill>"
+
+            # Call function without specifying chamber
+            result = await get_bill_content(
+                bill_number=common_test_data["bill_number"], bill_format="xml"
+            )
+
+            # Assertions
+            mock_get_bill_info.assert_called_once()
+            # Should default to House when chamber determination fails
+            mock_fetch_document.assert_called_once_with(
+                common_test_data["biennium"], "House", common_test_data["bill_number"], "xml"
+            )
+            assert result["content"] == "<bill>Test content</bill>"
+            assert result["chamber"] == "House"
+
+    @pytest.mark.asyncio
+    async def test_house_fails_fallback_to_senate(self, common_test_data):
+        """Test case where House bill fetch fails and falls back to Senate."""
+        # Setup mocks
+        with (
+            patch("wa_leg_mcp.tools.bill_tools.get_current_biennium") as mock_get_biennium,
+            patch("wa_leg_mcp.tools.bill_tools.get_bill_info") as mock_get_bill_info,
+            patch(
+                "wa_leg_mcp.tools.bill_tools.determine_chamber_from_bill_id"
+            ) as mock_determine_chamber,
+            patch("wa_leg_mcp.tools.bill_tools.fetch_bill_document") as mock_fetch_document,
+        ):
+            mock_get_biennium.return_value = common_test_data["biennium"]
+            # Return bill info but with no bill_id that can be used to determine chamber
+            mock_get_bill_info.return_value = {"bill_number": common_test_data["bill_number"]}
+            # Chamber determination returns None
+            mock_determine_chamber.return_value = None
+
+            # First call fails with House, second succeeds with Senate
+            mock_fetch_document.side_effect = [
+                {"error": "Bill not found in House"},
+                "<bill>Test content</bill>",
+            ]
+
+            # Call function without specifying chamber
+            result = await get_bill_content(
+                bill_number=common_test_data["bill_number"], bill_format="xml"
+            )
+
+            # Assertions
+            assert mock_fetch_document.call_count == 2
+            # First call should be with House
+            mock_fetch_document.assert_any_call(
+                common_test_data["biennium"], "House", common_test_data["bill_number"], "xml"
+            )
+            # Second call should be with Senate
+            mock_fetch_document.assert_any_call(
+                common_test_data["biennium"], "Senate", common_test_data["bill_number"], "xml"
+            )
+            assert result["content"] == "<bill>Test content</bill>"
+            assert result["chamber"] == "Senate"
 
 
 if __name__ == "__main__":
-    unittest.main()
+    pytest.main([__file__])

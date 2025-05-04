@@ -11,6 +11,7 @@ from wa_leg_mcp.tools.bill_tools import (
     get_bill_documents,
     get_bill_info,
     get_bill_status,
+    get_bills_by_year,
     search_bills,
 )
 
@@ -23,6 +24,7 @@ class TestBillTools(unittest.TestCase):
         self.test_bill_number = 1234  # Changed from "HB1234" to 1234
         self.test_biennium = "2023-24"
         self.test_year = "2023"
+        self.test_query = "climate change"
 
         # Sample bill data for testing
         self.mock_bill_data = [
@@ -70,6 +72,22 @@ class TestBillTools(unittest.TestCase):
                 "original_agency": "Senate",
                 "active": False,
                 "introduced_date": "2023-02-01",
+            },
+        ]
+
+        # Sample search results data
+        self.mock_search_results = [
+            {
+                "bill_id": "HB 1234",
+                "bill_number": 1234,
+                "biennium": "2023-24",
+                "description": "Relating to climate change mitigation",
+            },
+            {
+                "bill_id": "SB 5678",
+                "bill_number": 5678,
+                "biennium": "2023-24",
+                "description": "Addressing climate change impacts",
             },
         ]
 
@@ -186,14 +204,14 @@ class TestBillTools(unittest.TestCase):
 
     @patch("wa_leg_mcp.tools.bill_tools.get_current_year")
     @patch("wa_leg_mcp.tools.bill_tools.wsl_client")
-    def test_search_bills_success(self, mock_client, mock_get_current_year):
-        """Test successful bill search."""
+    def test_get_bills_by_year_success(self, mock_client, mock_get_current_year):
+        """Test successful bills by year retrieval."""
         # Setup mocks
         mock_get_current_year.return_value = self.test_year
         mock_client.get_legislation_by_year.return_value = self.mock_bills_by_year
 
         # Call function
-        result = search_bills()
+        result = get_bills_by_year()
 
         # Assertions
         mock_client.get_legislation_by_year.assert_called_once_with(self.test_year)
@@ -205,21 +223,21 @@ class TestBillTools(unittest.TestCase):
 
     @patch("wa_leg_mcp.tools.bill_tools.get_current_year")
     @patch("wa_leg_mcp.tools.bill_tools.wsl_client")
-    def test_search_bills_with_filters(self, mock_client, mock_get_current_year):
-        """Test bill search with filters."""
+    def test_get_bills_by_year_with_filters(self, mock_client, mock_get_current_year):
+        """Test bills by year retrieval with filters."""
         # Setup mocks
         mock_get_current_year.return_value = self.test_year
         mock_client.get_legislation_by_year.return_value = self.mock_bills_by_year
 
         # Call function with active_only filter
-        result = search_bills(active_only=True)
+        result = get_bills_by_year(active_only=True)
 
         # Assertions
         assert result["count"] == 1
         assert result["bills"][0]["bill_id"] == "HB 1000"
 
         # Call function with agency filter
-        result = search_bills(agency="Senate")
+        result = get_bills_by_year(agency="Senate")
 
         # Assertions
         assert result["count"] == 1
@@ -227,14 +245,14 @@ class TestBillTools(unittest.TestCase):
 
     @patch("wa_leg_mcp.tools.bill_tools.get_current_year")
     @patch("wa_leg_mcp.tools.bill_tools.wsl_client")
-    def test_search_bills_not_found(self, mock_client, mock_get_current_year):
-        """Test bill search with no results."""
+    def test_get_bills_by_year_not_found(self, mock_client, mock_get_current_year):
+        """Test bills by year retrieval with no results."""
         # Setup mocks
         mock_get_current_year.return_value = self.test_year
         mock_client.get_legislation_by_year.return_value = None
 
         # Call function
-        result = search_bills()
+        result = get_bills_by_year()
 
         # Assertions
         assert "error" in result
@@ -362,18 +380,18 @@ class TestBillTools(unittest.TestCase):
 
     @patch("wa_leg_mcp.tools.bill_tools.get_current_year")
     @patch("wa_leg_mcp.tools.bill_tools.wsl_client")
-    def test_search_bills_exception(self, mock_client, mock_get_current_year):
-        """Test exception handling in search_bills."""
+    def test_get_bills_by_year_exception(self, mock_client, mock_get_current_year):
+        """Test exception handling in get_bills_by_year."""
         # Setup mocks
         mock_get_current_year.return_value = self.test_year
         mock_client.get_legislation_by_year.side_effect = Exception("API Error")
 
         # Call function
-        result = search_bills()
+        result = get_bills_by_year()
 
         # Assertions
         assert "error" in result
-        assert "Failed to search bills" in result["error"]
+        assert "Failed to retrieve bills" in result["error"]
 
     @patch("wa_leg_mcp.tools.bill_tools.get_current_biennium")
     @patch("wa_leg_mcp.tools.bill_tools.wsl_client")
@@ -428,6 +446,55 @@ class TestBillTools(unittest.TestCase):
         # Assertions
         assert "error" in result
         assert "Failed to fetch amendments" in result["error"]
+
+    @patch("wa_leg_mcp.tools.bill_tools.get_current_biennium")
+    @patch("wa_leg_mcp.tools.bill_tools.wsl_search_client")
+    def test_search_bills_success(self, mock_search_client, mock_get_biennium):
+        """Test successful bill search with keywords."""
+        # Setup mocks
+        mock_get_biennium.return_value = self.test_biennium
+        mock_search_client.search_bills.return_value = self.mock_search_results
+
+        # Call function
+        result = search_bills(query=self.test_query)
+
+        # Assertions
+        mock_search_client.search_bills.assert_called_once()
+        assert result["query"] == self.test_query
+        assert result["count"] == 2
+        assert len(result["bills"]) == 2
+        assert result["bills"][0]["bill_id"] == "HB 1234"
+        assert result["bills"][1]["bill_id"] == "SB 5678"
+
+    @patch("wa_leg_mcp.tools.bill_tools.get_current_biennium")
+    @patch("wa_leg_mcp.tools.bill_tools.wsl_search_client")
+    def test_search_bills_not_found(self, mock_search_client, mock_get_biennium):
+        """Test bill search with no results."""
+        # Setup mocks
+        mock_get_biennium.return_value = self.test_biennium
+        mock_search_client.search_bills.return_value = []
+
+        # Call function
+        result = search_bills(query=self.test_query)
+
+        # Assertions
+        assert "error" in result
+        assert f"No bills found matching query: {self.test_query}" in result["error"]
+
+    @patch("wa_leg_mcp.tools.bill_tools.get_current_biennium")
+    @patch("wa_leg_mcp.tools.bill_tools.wsl_search_client")
+    def test_search_bills_exception(self, mock_search_client, mock_get_biennium):
+        """Test exception handling in search_bills."""
+        # Setup mocks
+        mock_get_biennium.return_value = self.test_biennium
+        mock_search_client.search_bills.side_effect = Exception("API Error")
+
+        # Call function
+        result = search_bills(query=self.test_query)
+
+        # Assertions
+        assert "error" in result
+        assert "Failed to search bills" in result["error"]
 
     @patch("wa_leg_mcp.tools.bill_tools.get_current_biennium")
     @patch("wa_leg_mcp.tools.bill_tools.wsl_client")

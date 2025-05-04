@@ -21,6 +21,7 @@ from .tools import (
     get_bill_documents,
     get_bill_info,
     get_bill_status,
+    get_bills_by_year,
     get_committee_meetings,
     search_bills,
 )
@@ -80,6 +81,7 @@ def get_default_tools() -> List[Callable]:
     return [
         get_bill_info,
         search_bills,
+        get_bills_by_year,
         get_committee_meetings,
         find_legislator,
         get_bill_status,

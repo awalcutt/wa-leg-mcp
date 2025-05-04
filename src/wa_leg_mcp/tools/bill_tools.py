@@ -3,14 +3,16 @@ Bill-related MCP tools for Washington State Legislature data.
 """
 
 import logging
-from typing import Any, Dict, Optional
+from typing import Any, Dict, List, Optional
 
 from ..clients.wsl_client import WSLClient
+from ..clients.wsl_search_client import WSLSearchClient
 from ..utils.formatters import get_current_biennium, get_current_year
 
 logger = logging.getLogger(__name__)
 
 wsl_client = WSLClient()
+wsl_search_client = WSLSearchClient()
 
 
 def get_bill_info(bill_number: int, biennium: Optional[str] = None) -> Dict[str, Any]:
@@ -66,10 +68,76 @@ def get_bill_info(bill_number: int, biennium: Optional[str] = None) -> Dict[str,
 
 
 def search_bills(
+    query: str,
+    bienniums: Optional[List[str]] = None,
+    agency: Optional[str] = None,
+    results_per_page: int = 50,
+    max_results: int = 100,
+) -> Dict[str, Any]:
+    """
+    Search for bills using keywords and optional filtering.
+
+    This function uses the WSL Search API to find bills matching the provided query
+    with optional filtering by biennium and agency.
+
+    Args:
+        query: Search query text (e.g., "climate change", "transportation")
+        bienniums: List of bienniums to search (format: "YYYY-YY") (optional, defaults to current)
+        agency: Filter by originating agency ("House", "Senate", or "Both") (optional, defaults to "Both")
+        results_per_page: Number of results per page (max 50)
+        max_results: Maximum number of total results to return (max 100)
+
+    Returns:
+        Dict containing list of bills matching the search criteria
+    """
+    try:
+        logger.info(f"Searching bills with query: {query}")
+
+        # Use current biennium if none provided
+        if not bienniums:
+            current_biennium = get_current_biennium()
+            bienniums = [current_biennium]
+            logger.info(f"Using current biennium: {current_biennium}")
+
+        # Convert agency parameter to expected format
+        search_agency = "Both"
+        if agency and agency.lower() in ["house", "senate"]:
+            search_agency = agency.capitalize()
+
+        # Limit results to reasonable defaults
+        if results_per_page > 50:
+            results_per_page = 50
+        if max_results > 100:
+            max_results = 100
+
+        # Search for bills
+        bills_data = wsl_search_client.search_bills(
+            query=query,
+            bienniums=bienniums,
+            results_per_page=results_per_page,
+            max_docs=max_results,
+            agency=search_agency,
+        )
+
+        if not bills_data or len(bills_data) == 0:
+            return {"error": f"No bills found matching query: {query}"}
+
+        return {
+            "query": query,
+            "count": len(bills_data),
+            "bills": bills_data,
+        }
+
+    except Exception as e:
+        logger.error(f"Error searching bills with query '{query}': {str(e)}")
+        return {"error": f"Failed to search bills: {str(e)}"}
+
+
+def get_bills_by_year(
     year: Optional[str] = None, agency: Optional[str] = None, active_only: bool = False
 ) -> Dict[str, Any]:
     """
-    Search for bills in a specific year with optional filtering.
+    Retrieve all bills from a specific year with optional filtering.
 
     This function retrieves all legislation for a year and allows filtering by agency
     (House or Senate) and active status.
@@ -86,7 +154,7 @@ def search_bills(
         if not year:
             year = get_current_year()
 
-        logger.info(f"Searching bills in year {year}")
+        logger.info(f"Retrieving bills from year {year}")
 
         # Get all bills for the year
         bills_data = wsl_client.get_legislation_by_year(year)
@@ -127,8 +195,8 @@ def search_bills(
         }
 
     except Exception as e:
-        logger.error(f"Error searching bills: {str(e)}")
-        return {"error": f"Failed to search bills: {str(e)}"}
+        logger.error(f"Error retrieving bills by year: {str(e)}")
+        return {"error": f"Failed to retrieve bills: {str(e)}"}
 
 
 def get_bill_status(bill_number: int, biennium: Optional[str] = None) -> Dict[str, Any]:

@@ -15,7 +15,8 @@ This MCP server connects AI assistants to the Washington State Legislative Web S
 
 ### Core Tools
 - `getBillInfo` - Retrieve detailed information about specific bills
-- `searchBills` - Search for bills by status, date range, or type
+- `searchBills` - Search for bills using keywords and optional filtering
+- `getBillsByYear` - Retrieve all bills from a specific year with filtering options
 - `getCommitteeMeetings` - Get committee meeting schedules and agendas
 - `findLegislator` - Find legislators by district or lookup sponsors
 - `getBillStatus` - Get current status and history of a bill
@@ -240,14 +241,26 @@ Parameters:
 Returns: Bill details including description, sponsor, status, fiscal notes, and companions
 
 #### searchBills
-Searches for bills based on various criteria using the GetLegislationByYear and related APIs.
+Searches for bills using keywords and optional filtering via the WSL Search API.
 
 Parameters:
-- `biennium` (string, required): Legislative biennium in format "2025-26"
-- `status` (string, optional): Filter by status ("passed_house", "passed_senate", "signed")
-- `introduced_since` (string, optional): Date in YYYY-MM-DD format
+- `query` (string, required): Search query text (e.g., "climate change", "transportation")
+- `bienniums` (array, optional): List of bienniums to search (format: "YYYY-YY"), defaults to current
+- `agency` (string, optional): Filter by originating agency ("House", "Senate", or "Both")
+- `results_per_page` (integer, optional): Number of results per page (max 50)
+- `max_results` (integer, optional): Maximum number of total results to return (max 100)
 
-Returns: List of bills matching criteria
+Returns: List of bills matching the search criteria
+
+#### getBillsByYear
+Retrieves all bills from a specific year with optional filtering using the GetLegislationByYear API.
+
+Parameters:
+- `year` (string, optional): Year in format "YYYY" (e.g., "2025"), defaults to current
+- `agency` (string, optional): Filter by originating agency ("House" or "Senate")
+- `active_only` (boolean, optional): If True, only return active bills
+
+Returns: List of bills matching the criteria
 
 #### getCommitteeMeetings
 Retrieves committee meetings and agendas using the GetCommitteeMeetings API.

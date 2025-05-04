@@ -10,6 +10,7 @@ from .bill_tools import (
     get_bill_documents,
     get_bill_info,
     get_bill_status,
+    get_bills_by_year,
     search_bills,
 )
 from .committee_tools import get_committee_meetings, get_committees
@@ -24,4 +25,5 @@ __all__ = [
     "get_committee_meetings",
     "get_committees",
     "find_legislator",
+    "get_bills_by_year",
 ]

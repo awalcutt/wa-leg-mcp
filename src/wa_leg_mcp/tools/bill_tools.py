@@ -3,7 +3,7 @@ Bill-related MCP tools for Washington State Legislature data.
 """
 
 import logging
-from typing import Any, Dict
+from typing import Any, Dict, Optional
 
 from ..clients.wsl_client import WSLClient
 from ..utils.formatters import get_current_biennium, get_current_year
@@ -13,13 +13,13 @@ logger = logging.getLogger(__name__)
 wsl_client = WSLClient()
 
 
-def get_bill_info(bill_number: str, biennium: str = None) -> Dict[str, Any]:
+def get_bill_info(bill_number: int, biennium: Optional[str] = None) -> Dict[str, Any]:
     """
     Retrieve detailed information about a specific bill.
 
     Args:
-        bill_number: Bill number (e.g., "HB1234", "SB5678")
-        biennium: Legislative biennium in format "2025-26" (optional, defaults to current)
+        bill_number: Bill number as an integer (e.g., 1234 for HB1234, 5678 for SB5678)
+        biennium: Legislative biennium in format "YYYY-YY" (e.g., "2025-26") (optional, defaults to current)
 
     Returns:
         Dict containing bill details including description, sponsor, status, etc.
@@ -31,7 +31,7 @@ def get_bill_info(bill_number: str, biennium: str = None) -> Dict[str, Any]:
         logger.info(f"Fetching bill info for {bill_number} in biennium {biennium}")
 
         # Get bill information
-        bills_data = wsl_client.get_legislation(biennium, bill_number)
+        bills_data = wsl_client.get_legislation(biennium, str(bill_number))
 
         if not bills_data or len(bills_data) == 0:
             return {"error": f"Bill {bill_number} not found in biennium {biennium}"}
@@ -65,7 +65,7 @@ def get_bill_info(bill_number: str, biennium: str = None) -> Dict[str, Any]:
         return {"error": f"Failed to fetch bill information: {str(e)}"}
 
 
-def search_bills(year: str = None, agency: str = None, active_only: bool = False) -> Dict[str, Any]:
+def search_bills(year: Optional[str] = None, agency: Optional[str] = None, active_only: bool = False) -> Dict[str, Any]:
     """
     Search for bills in a specific year with optional filtering.
 
@@ -74,7 +74,7 @@ def search_bills(year: str = None, agency: str = None, active_only: bool = False
 
     Args:
         year: Year in format "YYYY" (e.g., "2025") (optional, defaults to current)
-        agency: Filter by originating agency ("House" or "Senate")
+        agency: Filter by originating agency ("House" or "Senate") (optional)
         active_only: If True, only return active bills
 
     Returns:
@@ -129,13 +129,13 @@ def search_bills(year: str = None, agency: str = None, active_only: bool = False
         return {"error": f"Failed to search bills: {str(e)}"}
 
 
-def get_bill_status(bill_number: str, biennium: str = None) -> Dict[str, Any]:
+def get_bill_status(bill_number: int, biennium: Optional[str] = None) -> Dict[str, Any]:
     """
     Get the current status and history of a specific bill.
 
     Args:
-        bill_number: Bill number (e.g., "HB1234", "SB5678")
-        biennium: Legislative biennium in format "2025-26" (optional, defaults to current)
+        bill_number: Bill number as an integer (e.g., 1234 for HB1234, 5678 for SB5678)
+        biennium: Legislative biennium in format "YYYY-YY" (e.g., "2025-26") (optional, defaults to current)
 
     Returns:
         Dict containing current status and history
@@ -147,7 +147,7 @@ def get_bill_status(bill_number: str, biennium: str = None) -> Dict[str, Any]:
         logger.info(f"Fetching status for {bill_number} in biennium {biennium}")
 
         # Get bill information
-        bills_data = wsl_client.get_legislation(biennium, bill_number)
+        bills_data = wsl_client.get_legislation(biennium, str(bill_number))
 
         if not bills_data or len(bills_data) == 0:
             return {"error": f"Bill {bill_number} not found in biennium {biennium}"}
@@ -176,14 +176,14 @@ def get_bill_status(bill_number: str, biennium: str = None) -> Dict[str, Any]:
 
 
 def get_bill_documents(
-    bill_number: str, biennium: str = None, document_type: str = None
+    bill_number: int, biennium: Optional[str] = None, document_type: Optional[str] = None
 ) -> Dict[str, Any]:
     """
     Retrieve bill documents including bill text and amendments.
 
     Args:
-        bill_number: Bill number (e.g., "HB1234", "SB5678")
-        biennium: Legislative biennium in format "2025-26" (optional, defaults to current)
+        bill_number: Bill number as an integer (e.g., 1234 for HB1234, 5678 for SB5678)
+        biennium: Legislative biennium in format "YYYY-YY" (e.g., "2025-26") (optional, defaults to current)
         document_type: Filter by type - "bill", "amendment", "report" (optional)
 
     Returns:
@@ -196,7 +196,7 @@ def get_bill_documents(
         logger.info(f"Fetching documents for {bill_number} in biennium {biennium}")
 
         # Get document information
-        documents_data = wsl_client.get_documents(biennium, bill_number)
+        documents_data = wsl_client.get_documents(biennium, str(bill_number))
 
         if not documents_data or len(documents_data) == 0:
             return {"error": f"No documents found for bill {bill_number} in biennium {biennium}"}
@@ -236,13 +236,13 @@ def get_bill_documents(
         return {"error": f"Failed to fetch bill documents: {str(e)}"}
 
 
-def get_bill_amendments(bill_number: str, year: str = None) -> Dict[str, Any]:
+def get_bill_amendments(bill_number: int, year: Optional[str] = None) -> Dict[str, Any]:
     """
     Retrieve amendments for a specific bill.
 
     Args:
-        bill_number: Bill number (e.g., "HB1234", "SB5678")
-        year: Year in YYYY format (optional, defaults to current biennium year)
+        bill_number: Bill number as an integer (e.g., 1234 for HB1234, 5678 for SB5678)
+        year: Year in format "YYYY" (e.g., "2025") (optional, defaults to current year)
 
     Returns:
         Dict containing amendment metadata with links to HTML and PDF versions
@@ -254,38 +254,43 @@ def get_bill_amendments(bill_number: str, year: str = None) -> Dict[str, Any]:
 
         logger.info(f"Fetching amendments for {bill_number} in year {year}")
 
-        # Get amendments information
+        # Get amendment information
         amendments_data = wsl_client.get_amendments(year)
 
-        if not amendments_data or len(amendments_data) == 0:
-            return {"error": f"No amendments found for year {year}"}
+        if not amendments_data:
+            return {"error": f"Failed to fetch amendments for year {year}"}
 
         # Filter amendments for the specific bill
-        filtered_amendments = []
-        bill_num = bill_number.replace("HB", "").replace("SB", "").strip()
+        bill_amendments = [
+            amendment for amendment in amendments_data if amendment.get("bill_number") == bill_number
+        ]
 
-        for amendment in amendments_data:
-            if str(amendment.get("bill_number", "")) == bill_num:
-                filtered_amendments.append(
-                    {
-                        "name": amendment.get("name", ""),
-                        "bill_id": amendment.get("bill_id", ""),
-                        "sponsor_name": amendment.get("sponsor_name", ""),
-                        "description": amendment.get("description", ""),
-                        "floor_action": amendment.get("floor_action", ""),
-                        "floor_action_date": amendment.get("floor_action_date", ""),
-                        "htm_url": amendment.get("htm_url", ""),
-                        "pdf_url": amendment.get("pdf_url", ""),
-                        "agency": amendment.get("agency", ""),
-                        "type": amendment.get("type", ""),
-                    }
-                )
+        if not bill_amendments:
+            return {"error": f"No amendments found for bill {bill_number} in year {year}"}
+
+        # Extract relevant amendment information
+        formatted_amendments = []
+        for amendment in bill_amendments:
+            formatted_amendments.append(
+                {
+                    "name": amendment.get("name", ""),
+                    "bill_id": amendment.get("bill_id", ""),
+                    "type": amendment.get("type", ""),
+                    "sponsor_name": amendment.get("sponsor_name", ""),
+                    "description": amendment.get("description", ""),
+                    "floor_action": amendment.get("floor_action", ""),
+                    "floor_action_date": amendment.get("floor_action_date", ""),
+                    "htm_url": amendment.get("htm_url", ""),
+                    "pdf_url": amendment.get("pdf_url", ""),
+                    "agency": amendment.get("agency", ""),
+                }
+            )
 
         return {
             "bill_number": bill_number,
             "year": year,
-            "count": len(filtered_amendments),
-            "amendments": filtered_amendments,
+            "count": len(formatted_amendments),
+            "amendments": formatted_amendments,
         }
 
     except Exception as e:

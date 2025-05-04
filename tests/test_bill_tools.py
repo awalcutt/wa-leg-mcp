@@ -20,7 +20,7 @@ class TestBillTools(unittest.TestCase):
 
     def setUp(self):
         """Set up test fixtures."""
-        self.test_bill_number = "HB1234"
+        self.test_bill_number = 1234  # Changed from "HB1234" to 1234
         self.test_biennium = "2023-24"
         self.test_year = "2023"
 
@@ -144,7 +144,7 @@ class TestBillTools(unittest.TestCase):
 
         # Assertions
         mock_client.get_legislation.assert_called_once_with(
-            self.test_biennium, self.test_bill_number
+            self.test_biennium, str(self.test_bill_number)
         )
         assert result["bill_number"] == self.test_bill_number
         assert result["title"] == "Test Bill Title"
@@ -253,7 +253,7 @@ class TestBillTools(unittest.TestCase):
 
         # Assertions
         mock_client.get_legislation.assert_called_once_with(
-            self.test_biennium, self.test_bill_number
+            self.test_biennium, str(self.test_bill_number)
         )
         assert result["bill_number"] == self.test_bill_number
         assert result["current_status"] == "In Committee"
@@ -274,7 +274,7 @@ class TestBillTools(unittest.TestCase):
         result = get_bill_documents(self.test_bill_number)
 
         # Assertions
-        mock_client.get_documents.assert_called_once_with(self.test_biennium, self.test_bill_number)
+        mock_client.get_documents.assert_called_once_with(self.test_biennium, str(self.test_bill_number))
         assert result["bill_number"] == self.test_bill_number
         assert result["count"] == 2
         assert len(result["documents"]) == 2
@@ -386,7 +386,7 @@ class TestBillTools(unittest.TestCase):
 
         # Assertions
         mock_client.get_legislation.assert_called_once_with(
-            explicit_biennium, self.test_bill_number
+            explicit_biennium, str(self.test_bill_number)
         )
         assert result["biennium"] == explicit_biennium
         # mock_get_biennium should not be called when biennium is provided
@@ -425,7 +425,25 @@ class TestBillTools(unittest.TestCase):
 
         # Assertions
         assert "error" in result
-        assert "No amendments found" in result["error"]
+        assert "Failed to fetch amendments" in result["error"]
+        
+    @patch("wa_leg_mcp.tools.bill_tools.get_current_biennium")
+    @patch("wa_leg_mcp.tools.bill_tools.wsl_client")
+    def test_get_bill_amendments_no_matching_bill(self, mock_client, mock_get_biennium):
+        """Test scenario where amendments exist but none match the requested bill number."""
+        # Setup mocks
+        mock_get_biennium.return_value = self.test_biennium
+        # Create amendments data with only bill 5678, not our test bill 1234
+        amendments_data = [amendment for amendment in self.mock_amendments_data 
+                          if amendment.get("bill_number") != self.test_bill_number]
+        mock_client.get_amendments.return_value = amendments_data
+
+        # Call function
+        result = get_bill_amendments(self.test_bill_number)
+
+        # Assertions
+        assert "error" in result
+        assert f"No amendments found for bill {self.test_bill_number}" in result["error"]
 
     @patch("wa_leg_mcp.tools.bill_tools.get_current_biennium")
     @patch("wa_leg_mcp.tools.bill_tools.wsl_client")

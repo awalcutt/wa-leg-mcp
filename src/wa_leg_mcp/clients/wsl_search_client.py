@@ -41,12 +41,10 @@ class WSLSearchClient:
         self,
         query: str,
         bienniums: Optional[List[str]] = None,
-        results_per_page: int = 50,
         max_docs: int = 1000,
         proximity: int = 5,
         sort_by: str = "Rank",
         agency: str = "Both",
-        page: int = 0,
     ) -> Optional[List[Dict[str, Any]]]:
         """
         Search for bills using the WSL Search API.
@@ -54,12 +52,10 @@ class WSLSearchClient:
         Args:
             query: The search query text
             bienniums: List of bienniums to search (format: "YYYY-YY"). Defaults to current biennium.
-            results_per_page: Number of results per page (max 1000)
             max_docs: Maximum number of documents to return (max 1000)
             proximity: Search proximity value
             sort_by: Sort method ("Rank" or "Name")
             agency: Agency filter ("House", "Senate", or "Both")
-            page: Page number for pagination
 
         Returns:
             List of bill search results or None if the request failed
@@ -71,8 +67,6 @@ class WSLSearchClient:
             ]  # This should be dynamically determined in a production environment
 
         # Validate parameters
-        if results_per_page > 1000:
-            results_per_page = 1000
         if max_docs > 1000:
             max_docs = 1000
         if sort_by not in ["Rank", "Name"]:
@@ -84,7 +78,7 @@ class WSLSearchClient:
         search_params = {
             "Query": query,
             "DocLike": "",
-            "ResultsPerPage": str(results_per_page),
+            "ResultsPerPage": str(max_docs),  # Set results_per_page to same as max_docs
             "MaxDocs": str(max_docs),
             "Proximity": str(proximity),
             "SortBy": sort_by,
@@ -96,7 +90,7 @@ class WSLSearchClient:
             "YearlyDocs": [],
             "WebDocs": [],
             "Zones": [],
-            "Page": page,
+            "Page": 0,  # Always use page 0
         }
 
         try:

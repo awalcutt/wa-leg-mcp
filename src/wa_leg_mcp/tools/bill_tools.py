@@ -75,7 +75,6 @@ def search_bills(
     query: str,
     bienniums: Optional[List[str]] = None,
     agency: Optional[str] = None,
-    results_per_page: int = 50,
     max_results: int = 100,
 ) -> Dict[str, Any]:
     """
@@ -88,7 +87,6 @@ def search_bills(
         query: Search query text (e.g., "climate change", "transportation")
         bienniums: List of bienniums to search (format: "YYYY-YY") (optional, defaults to current)
         agency: Filter by originating agency ("House", "Senate", or "Both") (optional, defaults to "Both")
-        results_per_page: Number of results per page (max 50)
         max_results: Maximum number of total results to return (max 100)
 
     Returns:
@@ -109,8 +107,6 @@ def search_bills(
             search_agency = agency.capitalize()
 
         # Limit results to reasonable defaults
-        if results_per_page > 50:
-            results_per_page = 50
         if max_results > 100:
             max_results = 100
 
@@ -118,7 +114,6 @@ def search_bills(
         bills_data = wsl_search_client.search_bills(
             query=query,
             bienniums=bienniums,
-            results_per_page=results_per_page,
             max_docs=max_results,
             agency=search_agency,
         )

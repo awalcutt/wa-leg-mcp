@@ -248,7 +248,6 @@ Parameters:
 - `query` (string, required): Search query text (e.g., "climate change", "transportation")
 - `bienniums` (array, optional): List of bienniums to search (format: "YYYY-YY"), defaults to current
 - `agency` (string, optional): Filter by originating agency ("House", "Senate", or "Both")
-- `results_per_page` (integer, optional): Number of results per page (max 50)
 - `max_results` (integer, optional): Maximum number of total results to return (max 100)
 
 Returns: List of bills matching the search criteria

@@ -23,7 +23,7 @@ def main():
     # Search for bills containing "artificial intelligence"
     print("Searching for bills related to 'artificial intelligence'...")
     results = client.search_bills(
-        query="artificial intelligence", bienniums=["2025-26"], results_per_page=10, sort_by="Rank"
+        query="artificial intelligence", bienniums=["2025-26"], max_docs=10, sort_by="Rank"
     )
 
     # Display results

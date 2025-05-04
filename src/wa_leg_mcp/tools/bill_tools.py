@@ -7,6 +7,10 @@ from typing import Any, Dict, List, Optional
 
 from ..clients.wsl_client import WSLClient
 from ..clients.wsl_search_client import WSLSearchClient
+from ..utils.bill_document_utils import (
+    determine_chamber_from_bill_id,
+    fetch_bill_document,
+)
 from ..utils.formatters import get_current_biennium, get_current_year
 
 logger = logging.getLogger(__name__)
@@ -258,6 +262,10 @@ def get_bill_documents(
 
     Returns:
         Dict containing document metadata with links to HTML and PDF versions
+
+    Note:
+        This tool returns metadata about available documents. To get the actual content
+        of a bill in AI-friendly format, use the get_bill_content tool.
     """
     try:
         if not biennium:
@@ -368,3 +376,86 @@ def get_bill_amendments(bill_number: int, year: Optional[str] = None) -> Dict[st
     except Exception as e:
         logger.error(f"Error fetching bill amendments: {str(e)}")
         return {"error": f"Failed to fetch bill amendments: {str(e)}"}
+
+
+async def get_bill_content(
+    bill_number: int,
+    biennium: Optional[str] = None,
+    chamber: Optional[str] = None,
+    bill_format: str = "xml",
+) -> Dict[str, Any]:
+    """
+    Retrieve the content of a bill in an AI-friendly format.
+
+    This tool fetches the actual content of a bill document, defaulting to XML format
+    which is most suitable for AI processing due to its structured nature. It can also
+    return HTML content or a link to the PDF version.
+
+    Args:
+        bill_number: Bill number as an integer (e.g., 1234 for HB1234, 5678 for SB5678)
+        biennium: Legislative biennium in format "YYYY-YY" (e.g., "2025-26") (optional, defaults to current)
+        chamber: Chamber name - "House" or "Senate" (optional if bill_number is unique across chambers)
+        bill_format: Document format - "xml" (default), "htm", or "pdf"
+
+    Returns:
+        For XML and HTM formats: Dict containing the document content and metadata
+        For PDF format: Dict containing the URL to access the PDF and metadata
+
+    Note:
+        This tool complements the get_bill_documents tool, which provides metadata about
+        available documents. This tool provides the actual content of the bill.
+
+        When citing bill content in responses, consider including a link to the PDF version
+        using the format: https://lawfilesext.leg.wa.gov/biennium/{biennium}/Pdf/Bills/{chamber}%20Bills/{bill_number}.pdf
+    """
+    try:
+        if not biennium:
+            biennium = get_current_biennium()
+
+        logger.info(
+            f"Fetching bill content for {bill_number} in biennium {biennium}, format: {bill_format}"
+        )
+
+        # Validate format
+        if bill_format not in ["xml", "htm", "pdf"]:
+            return {"error": f"Invalid format: {bill_format}. Must be 'xml', 'htm', or 'pdf'"}
+
+        # If chamber is not provided, try to determine it
+        if not chamber:
+            # First try to get bill info to determine chamber
+            bill_info = get_bill_info(bill_number, biennium)
+            if "error" not in bill_info:
+                bill_id = bill_info.get("bill_id", "")
+                chamber = determine_chamber_from_bill_id(bill_id)
+
+            # If still not determined, default to trying House first
+            if not chamber:
+                chamber = "House"
+                logger.info(f"Chamber not specified, trying {chamber} first")
+
+        # Validate and fetch the document
+        result = await fetch_bill_document(biennium, chamber, str(bill_number), bill_format)
+
+        # If error with House, try Senate
+        if isinstance(result, dict) and "error" in result and chamber == "House":
+            logger.info("Bill not found in House, trying Senate")
+            chamber = "Senate"
+            result = await fetch_bill_document(biennium, chamber, str(bill_number), bill_format)
+
+        # For XML and HTM, wrap the content in a dictionary with metadata
+        if isinstance(result, str):
+            return {
+                "content": result,
+                "format": bill_format,
+                "bill_number": bill_number,
+                "biennium": biennium,
+                "chamber": chamber,
+                "pdf_url": f"https://lawfilesext.leg.wa.gov/biennium/{biennium}/Pdf/Bills/{chamber}%20Bills/{bill_number}.pdf",
+                "html_url": f"https://lawfilesext.leg.wa.gov/biennium/{biennium}/Htm/Bills/{chamber}%20Bills/{bill_number}.htm",
+            }
+
+        return result
+
+    except Exception as e:
+        logger.error(f"Error fetching bill content: {str(e)}")
+        return {"error": f"Failed to fetch bill content: {str(e)}"}

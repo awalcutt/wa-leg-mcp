@@ -7,6 +7,7 @@ with the Washington State Legislature API.
 
 from .bill_tools import (
     get_bill_amendments,
+    get_bill_content,
     get_bill_documents,
     get_bill_info,
     get_bill_status,
@@ -21,6 +22,7 @@ __all__ = [
     "search_bills",
     "get_bill_status",
     "get_bill_documents",
+    "get_bill_content",
     "get_bill_amendments",
     "get_committee_meetings",
     "get_committees",

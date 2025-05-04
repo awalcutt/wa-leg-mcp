@@ -18,6 +18,7 @@ from mcp.server.fastmcp import FastMCP
 from .resources.bill_resources import get_bill_document_templates, read_bill_document
 from .tools import (
     find_legislator,
+    get_bill_content,
     get_bill_documents,
     get_bill_info,
     get_bill_status,
@@ -86,6 +87,7 @@ def get_default_tools() -> List[Callable]:
         find_legislator,
         get_bill_status,
         get_bill_documents,
+        get_bill_content,
         ping,
     ]
 

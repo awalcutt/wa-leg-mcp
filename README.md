@@ -20,7 +20,8 @@ This MCP server connects AI assistants to the Washington State Legislative Web S
 - `getCommitteeMeetings` - Get committee meeting schedules and agendas
 - `findLegislator` - Find legislators by district or lookup sponsors
 - `getBillStatus` - Get current status and history of a bill
-- `getBillDocuments` - Retrieve bill text and amendments
+- `getBillDocuments` - Retrieve bill document metadata with links
+- `getBillContent` - Retrieve the actual content of a bill in AI-friendly format
 
 ### MCP Resources
 - `bill://xml/{biennium}/{chamber}/{bill_number}` - Access bill documents in structured XML format
@@ -291,7 +292,7 @@ Parameters:
 Returns: Current status, history, action dates, and status descriptions
 
 #### getBillDocuments
-Retrieves bill documents (functionality based on Document service endpoints).
+Retrieves bill documents metadata (functionality based on Document service endpoints).
 
 Parameters:
 - `bill_number` (string, required): Bill number
@@ -299,6 +300,17 @@ Parameters:
 - `document_type` (string, optional): "bill", "amendment", "report"
 
 Returns: Document metadata with links to HTML and PDF versions
+
+#### getBillContent
+Retrieves the actual content of a bill in an AI-friendly format.
+
+Parameters:
+- `bill_number` (integer, required): Bill number as an integer (e.g., 1234 for HB1234)
+- `biennium` (string, optional): Legislative biennium in format "2025-26" (defaults to current)
+- `chamber` (string, optional): Chamber name - "House" or "Senate" (optional if bill_number is unique across chambers)
+- `bill_format` (string, optional): Document format - "xml" (default), "htm", or "pdf"
+
+Returns: For XML and HTM formats: Dict containing the document content and metadata. For PDF format: Dict containing the URL to access the PDF and metadata.
 
 ### Resources
 

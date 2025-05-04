@@ -6,13 +6,14 @@ import unittest
 from datetime import datetime
 from unittest.mock import AsyncMock, MagicMock, patch
 
-import httpx
 import pytest
 
 from wa_leg_mcp.resources.bill_resources import (
     get_bill_document_templates,
     get_bill_document_url,
     read_bill_document,
+)
+from wa_leg_mcp.utils.bill_document_utils import (
     validate_biennium,
     validate_bill_number,
     validate_chamber,
@@ -229,51 +230,64 @@ class TestReadBillDocument:
             client_instance.get.return_value = response
             yield client_instance
 
+    @pytest.mark.asyncio
     async def test_read_bill_document_xml(self, mock_httpx_client):
         """Test reading an XML bill document."""
-        result = await read_bill_document(
-            uri="bill://xml/2025-26/House/1234",
-            biennium="2025-26",
-            chamber="House",
-            bill_number="1234",
-            bill_format="xml",
-        )
+        with patch("wa_leg_mcp.resources.bill_resources.fetch_bill_document") as mock_fetch:
+            mock_fetch.return_value = "<bill>Test Bill Content</bill>"
 
-        # Check that the client was called with the correct URL
-        expected_url = (
-            "https://lawfilesext.leg.wa.gov/biennium/2025-26/Xml/Bills/House%20Bills/1234.xml"
-        )
-        mock_httpx_client.get.assert_called_once()
-        args, kwargs = mock_httpx_client.get.call_args
-        assert args[0] == expected_url
+            result = await read_bill_document(
+                uri="bill://xml/2025-26/House/1234",
+                biennium="2025-26",
+                chamber="House",
+                bill_number="1234",
+                bill_format="xml",
+            )
 
-        # Check that the result is the response text
-        assert result == "<bill>Test Bill Content</bill>"
+            # Check that fetch_bill_document was called with the right parameters
+            mock_fetch.assert_called_once_with("2025-26", "House", "1234", "xml")
 
+            # Check that the result is the response text
+            assert result == "<bill>Test Bill Content</bill>"
+
+    @pytest.mark.asyncio
     async def test_read_bill_document_pdf(self):
         """Test reading a PDF bill document (returns URL only)."""
-        result = await read_bill_document(
-            uri="bill://pdf/2025-26/Senate/5678",
-            biennium="2025-26",
-            chamber="Senate",
-            bill_number="5678",
-            bill_format="pdf",
-        )
+        with patch("wa_leg_mcp.resources.bill_resources.fetch_bill_document") as mock_fetch:
+            mock_fetch.return_value = {
+                "url": "https://lawfilesext.leg.wa.gov/biennium/2025-26/Pdf/Bills/Senate%20Bills/5678.pdf",
+                "mime_type": "application/pdf",
+                "bill_info": {
+                    "biennium": "2025-26",
+                    "chamber": "Senate",
+                    "bill_number": "5678",
+                    "format": "pdf",
+                },
+            }
 
-        # For PDF, we should get a dictionary with the URL
-        assert isinstance(result, dict)
-        assert "url" in result
-        assert (
-            result["url"]
-            == "https://lawfilesext.leg.wa.gov/biennium/2025-26/Pdf/Bills/Senate%20Bills/5678.pdf"
-        )
-        assert result["mime_type"] == "application/pdf"
-        assert "bill_info" in result
+            result = await read_bill_document(
+                uri="bill://pdf/2025-26/Senate/5678",
+                biennium="2025-26",
+                chamber="Senate",
+                bill_number="5678",
+                bill_format="pdf",
+            )
 
+            # For PDF, we should get a dictionary with the URL
+            assert isinstance(result, dict)
+            assert "url" in result
+            assert (
+                result["url"]
+                == "https://lawfilesext.leg.wa.gov/biennium/2025-26/Pdf/Bills/Senate%20Bills/5678.pdf"
+            )
+            assert result["mime_type"] == "application/pdf"
+            assert "bill_info" in result
+
+    @pytest.mark.asyncio
     async def test_read_bill_document_format_from_uri(self):
         """Test extracting format from URI when not explicitly provided."""
-        with patch("wa_leg_mcp.resources.bill_resources.get_bill_document_url") as mock_url:
-            mock_url.return_value = "https://example.com/test.xml"
+        with patch("wa_leg_mcp.resources.bill_resources.fetch_bill_document") as mock_fetch:
+            mock_fetch.return_value = "<bill>Test Bill Content</bill>"
 
             # Test XML format extraction
             await read_bill_document(
@@ -282,8 +296,8 @@ class TestReadBillDocument:
                 chamber="House",
                 bill_number="1234",
             )
-            mock_url.assert_called_with("2025-26", "House", "1234", "xml")
-            mock_url.reset_mock()
+            mock_fetch.assert_called_with("2025-26", "House", "1234", "xml")
+            mock_fetch.reset_mock()
 
             # Test HTM format extraction
             await read_bill_document(
@@ -292,8 +306,8 @@ class TestReadBillDocument:
                 chamber="House",
                 bill_number="1234",
             )
-            mock_url.assert_called_with("2025-26", "House", "1234", "htm")
-            mock_url.reset_mock()
+            mock_fetch.assert_called_with("2025-26", "House", "1234", "htm")
+            mock_fetch.reset_mock()
 
             # Test PDF format extraction
             await read_bill_document(
@@ -302,88 +316,63 @@ class TestReadBillDocument:
                 chamber="House",
                 bill_number="1234",
             )
-            mock_url.assert_called_with("2025-26", "House", "1234", "pdf")
-            mock_url.reset_mock()
+            mock_fetch.assert_called_with("2025-26", "House", "1234", "pdf")
+            mock_fetch.reset_mock()
 
             # Test document format extraction
             await read_bill_document(
-                uri="bill://document/pdf/2025-26/House/1234",
+                uri="bill://document/xml/2025-26/House/1234",
                 biennium="2025-26",
                 chamber="House",
                 bill_number="1234",
             )
-            mock_url.assert_called_with("2025-26", "House", "1234", "pdf")
-            mock_url.reset_mock()
+            mock_fetch.assert_called_with("2025-26", "House", "1234", "xml")
+            mock_fetch.reset_mock()
 
-            # Test default to XML when format can't be extracted
+            # Test default to XML when format not in URI
             await read_bill_document(
-                uri="bill://unknown/2025-26/House/1234",
+                uri="bill://other/2025-26/House/1234",
                 biennium="2025-26",
                 chamber="House",
                 bill_number="1234",
             )
-            mock_url.assert_called_with("2025-26", "House", "1234", "xml")
+            mock_fetch.assert_called_with("2025-26", "House", "1234", "xml")
 
-    async def test_read_bill_document_invalid_biennium(self):
-        """Test with invalid biennium."""
-        result = await read_bill_document(
-            uri="bill://xml/2024-25/House/1234",  # Invalid biennium (even year)
-            biennium="2024-25",
-            chamber="House",
-            bill_number="1234",
-        )
+    @pytest.mark.asyncio
+    async def test_read_bill_document_validation_error(self):
+        """Test handling of validation errors."""
+        with patch("wa_leg_mcp.resources.bill_resources.fetch_bill_document") as mock_fetch:
+            mock_fetch.return_value = {"error": "Invalid biennium format"}
 
-        assert isinstance(result, dict)
-        assert "error" in result
-        assert "Invalid biennium format" in result["error"]
+            result = await read_bill_document(
+                uri="bill://xml/invalid/House/1234",
+                biennium="invalid",
+                chamber="House",
+                bill_number="1234",
+            )
 
-    async def test_read_bill_document_invalid_chamber(self):
-        """Test with invalid chamber."""
-        result = await read_bill_document(
-            uri="bill://xml/2025-26/house/1234",  # Lowercase chamber
-            biennium="2025-26",
-            chamber="house",
-            bill_number="1234",
-        )
+            assert "error" in result
+            assert result["error"] == "Invalid biennium format"
 
-        assert isinstance(result, dict)
-        assert "error" in result
-        assert "Invalid chamber" in result["error"]
-
-    async def test_read_bill_document_invalid_bill_number(self):
-        """Test with invalid bill number."""
-        result = await read_bill_document(
-            uri="bill://xml/2025-26/House/HB1234",  # Invalid bill number format
-            biennium="2025-26",
-            chamber="House",
-            bill_number="HB1234",
-        )
-
-        assert isinstance(result, dict)
-        assert "error" in result
-        assert "Invalid bill number" in result["error"]
-
-    async def test_read_bill_document_http_error(self, mock_httpx_client):
+    @pytest.mark.asyncio
+    async def test_read_bill_document_http_error(self):
         """Test handling of HTTP errors."""
-        # Make the request raise an exception
-        mock_httpx_client.get.side_effect = httpx.HTTPError("HTTP Error")
+        with patch("wa_leg_mcp.resources.bill_resources.fetch_bill_document") as mock_fetch:
+            mock_fetch.return_value = {
+                "error": "Could not fetch content",
+                "url": "https://example.com/error",
+            }
 
-        result = await read_bill_document(
-            uri="bill://xml/2025-26/House/1234",
-            biennium="2025-26",
-            chamber="House",
-            bill_number="1234",
-        )
+            result = await read_bill_document(
+                uri="bill://xml/2025-26/House/1234",
+                biennium="2025-26",
+                chamber="House",
+                bill_number="1234",
+            )
 
-        assert isinstance(result, dict)
-        assert "error" in result
-        assert "Could not fetch content" in result["error"]
-        assert "url" in result  # Should still provide the URL as fallback
-        assert "bill_info" in result  # Should include bill info
-        assert result["bill_info"]["biennium"] == "2025-26"
-        assert result["bill_info"]["chamber"] == "House"
-        assert result["bill_info"]["bill_number"] == "1234"
-        assert result["bill_info"]["format"] == "xml"
+            assert "error" in result
+            assert "Could not fetch content" in result["error"]
+            assert "url" in result
 
 
 if __name__ == "__main__":

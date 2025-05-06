@@ -28,6 +28,7 @@ jobs:
 
       - name: Build release distributions
         run: |
+          make install
           make release
 
       - name: Upload distributions

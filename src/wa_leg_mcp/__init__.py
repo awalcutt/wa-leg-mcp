@@ -6,10 +6,7 @@ Washington State Legislature data, enabling civic engagement through
 conversational interfaces.
 """
 
-__version__ = "0.1.0"
-__author__ = "Alex Adacutt"
-
-# Package-level imports
+from .__version__ import __version__
 from .server import create_server, main
 
-__all__ = ["create_server", "main"]
+__all__ = ["create_server", "main", "__version__"]

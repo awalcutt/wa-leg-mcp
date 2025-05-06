@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "wa-leg-mcp"
-version = "0.1.0"
+dynamic = ["version"]
 description = "Model Context Protocol server for Washington State Legislative Web Services API"
 readme = "README.md"
 requires-python = ">=3.10"

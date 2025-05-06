@@ -176,7 +176,7 @@ async def fetch_bill_document(
     try:
         async with httpx.AsyncClient() as client:
             response = await client.get(document_url, timeout=30.0)
-            await response.raise_for_status()
+            response.raise_for_status()
             return response.text
 
     except Exception as e:

@@ -3,7 +3,7 @@ Tests for bill_document_utils.py organized by functionality
 """
 
 from datetime import datetime
-from unittest.mock import AsyncMock, patch
+from unittest.mock import AsyncMock, Mock, patch
 
 import pytest
 
@@ -175,9 +175,12 @@ class TestFetchBillDocument:
             client_instance = AsyncMock()
             mock.return_value.__aenter__.return_value = client_instance
 
-            # Setup the response - use AsyncMock for the entire response object
-            response = AsyncMock()
+            # Setup the response - use a regular Mock for the response object
+            # since raise_for_status() is not awaitable in the real httpx
+            response = Mock()
             response.text = "<bill>Test Bill Content</bill>"
+            # Make sure raise_for_status doesn't have __await__ attribute
+            response.raise_for_status = Mock()
 
             client_instance.get.return_value = response
             yield client_instance

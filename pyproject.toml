@@ -62,6 +62,9 @@ Issues = "https://github.com/awalcutt/wa-leg-mcp/issues"
 [project.scripts]
 wa-leg-mcp = "wa_leg_mcp.server:main"
 
+[tool.setuptools.dynamic]
+version = {attr = "wa_leg_mcp.__version__.__version__"}
+
 [tool.setuptools.packages.find]
 where = ["src"]
 include = ["wa_leg_mcp*"]
